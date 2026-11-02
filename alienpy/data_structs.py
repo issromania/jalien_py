@@ -1,6 +1,8 @@
 """alienpy:: Definitions of data structures"""
 
 import sys
+import json
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, Any, NamedTuple, List, Optional
 
@@ -142,6 +144,68 @@ class RET:
 
     def __bool__(self) -> bool:
         return self.exitcode == 0
+
+    def show(self) -> None:
+        """Print exitcode, stdout and stderr"""
+        print(f'ExitCode  : {self.exitcode}\nStdOut    : {self.out}\nStdErr    : {self.err}\n', flush = True)
+
+    def getdict(self) -> dict[str, Any]:
+        """Return ansdict as dict: json string is parsed, list is wrapped as {'anslist': list}, anything else gives {}"""
+        ans = self.ansdict
+        if isinstance(ans, (str, bytes, bytearray)):
+            try:
+                ans = json.loads(ans)
+            except Exception:
+                return {}
+        if isinstance(ans, dict): return ans
+        if isinstance(ans, list): return {'anslist': ans}
+        return {}
+
+    def json(self) -> None:
+        """Print the server reply dictionary as json"""
+        # lazy import: global_vars imports data_structs, a module level import would be circular
+        from .global_vars import ALIENPY_FANCY_PRINT, rich_print_json  # pylint: disable=import-outside-toplevel
+        if not self.ansdict:
+            print('No command dictionary returned!', flush = True)
+            return
+        if isinstance(self.ansdict, (dict, list)):
+            ans_dict = self.ansdict
+        else:
+            try:
+                ans_dict = json.loads(self.ansdict)
+            except Exception:
+                print('invalid returned dictionary', file = sys.stderr, flush = True)
+                return
+        if isinstance(ans_dict, (dict, list)):
+            if ALIENPY_FANCY_PRINT:
+                rich_print_json(data = ans_dict)
+            else:
+                print(json.dumps(ans_dict, sort_keys = True, indent = 2, separators = None, skipkeys = False), flush = True)
+
+    def print(self, opts: str = '') -> int:
+        """Log/print err or out based on exitcode; return exitcode
+        opts content will steer the logging and message printing:
+         - noprint : silence all stdout/stderr printing
+         - noerr/noout : silence the respective messages
+         - debug/info/warn : log the stderr to that facility (default: error)
+        """
+        if self.exitcode != 0:
+            if 'debug' in opts:
+                logging.debug(self.err)
+            elif 'info' in opts:
+                logging.info(self.err)
+            elif 'warn' in opts:
+                logging.warning(self.err)
+            else:
+                logging.error(self.err)
+            if self.err and not ('noerr' in opts or 'noprint' in opts): print(f'{self.err.strip()}', file = sys.stderr, flush = True)
+        else:
+            if self.out and not ('noout' in opts or 'noprint' in opts): print(f'{self.out.strip()}', flush = True)
+        return self.exitcode
+
+    def exitcode(self) -> int:
+        """Return exitcode"""
+        return self.exitcode
 
 
 @dataclass(frozen=True)

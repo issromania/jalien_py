@@ -853,8 +853,8 @@ task name / detector name / [ / time [ / key = value]* ]
             filename = f"{name}_{etag}{'.' + ext if ext else ''}"
 
         q['Last-Modified-nice'] = unixtime2local(q['Last-Modified'])
-        q['Valid-From-nice'] = unixtime2local(q['Valid-From'])
-        q['Valid-Until-nice'] = unixtime2local(q['Valid-Until'])
+        q['Valid-From-nice'] = unixtime2local(q['Valid-From']) if len(str(q['Valid-From'])) >= 10 else ''  # run based objects have run numbers, not unix time
+        q['Valid-Until-nice'] = unixtime2local(q['Valid-Until']) if len(str(q['Valid-Until'])) >= 10 else ''
         q['Lifetime'] = int(q['Valid-Until']) - int(q['Valid-From'])  # milliseconds
 
         # destination filename

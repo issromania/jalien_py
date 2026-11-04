@@ -780,8 +780,8 @@ task name / detector name / [ / time [ / key = value]* ]
         else:
             ccdb_obj_path_elements.append(el)
 
-    if run_nr and ccdb_time and obj_time:
-        return RET(1, '', '-run and -objtime and time specification in query are conflicting options')
+    if (run_nr or obj_time) and ccdb_time:
+        return RET(1, '', '-run/-objtime and time specification in query are conflicting options')
 
     if not ccdb_time:
         if run_nr:

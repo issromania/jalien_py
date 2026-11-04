@@ -721,6 +721,7 @@ task name / detector name / [ / time [ / key = value]* ]
 
     host_arg = get_arg_value(args, '-host')
     do_unixtime = get_arg(args, '-unixtime')
+    get_arg(args, '-nicetime')  # documented option; human readable time is the default
     do_download = get_arg(args, '-get')
     do_http = get_arg(args, '-http')
     do_mirror = get_arg(args, '-mirror')
@@ -733,6 +734,9 @@ task name / detector name / [ / time [ / key = value]* ]
     headers_list = get_arg_multiple(args, '-header')
 
     if not args: return RET(2, '', 'empty query!')
+    unknown_opts = [a for a in args if str(a).startswith('-')]
+    if unknown_opts: return RET(22, '', f'unknown option(s) or option(s) without value: {" ".join(unknown_opts)}')
+    if len(args) > 1: return RET(22, '', f'only one query is supported, got: {" ".join(map(str, args))}')
 
     if do_download and do_mirror:
         return RET(1, '', '-get and -mirror are conflicting options')

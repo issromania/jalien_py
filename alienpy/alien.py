@@ -867,6 +867,7 @@ task name / detector name / [ / time [ / key = value]* ]
 
     # list of src,dst tuples for download
     download_list = []
+    no_replica_list = []  # objects without a replica usable for the selected transport
 
     # list of objects for message output in case of no download or mirror
     msg_obj_list = []
@@ -901,9 +902,10 @@ task name / detector name / [ / time [ / key = value]* ]
         # create list of src,dst pairs to be downloaded: exactly one source per object
         src = ccdb_select_src(q.get('replicas', []), ccdb, do_http)
         if src: download_list.append((src, f'file:{dst_filepath}' if src.startswith('alien:') else dst_filepath, q))
+        elif do_download or do_mirror: no_replica_list.append(f'{q["path"]}/{dequote(q["ETag"])}')
 
     if do_download or do_mirror:
-        errors = []
+        errors = [f'{obj}: no {"http" if do_http else "alien"} replica found' for obj in no_replica_list]
         xrd_out = ''
         if download_list and do_http:
             for src, dst, q in download_list:

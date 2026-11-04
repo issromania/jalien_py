@@ -59,9 +59,15 @@ alienpy_alien.ALIENPY_GLOBAL_WB = wb
 ##   END OF INITIALIZATION
 ########################################
 
+# CCDB paths with validity in run numbers (not in ms timestamps): -run (SOR time) cannot select their objects,
+# so they are always mirrored with the run number as validity time in the query
+RUN_VALIDITY_PATHS = ('RCT/Info/RunInformation',)
+
+mirror_jobs = [(path, ['-history', '-limit', '9999', '-mirror', '-dst', dst_dir, f'{path}/{runnr}']) for path in RUN_VALIDITY_PATHS]
+mirror_jobs.extend((path, ['-history', '-limit', '9999', '-run', runnr, '-mirror', '-dst', dst_dir, path]) for path in ccdb_paths if path.strip('/') not in RUN_VALIDITY_PATHS)
+
 final_exitcode = 0
-for path in ccdb_paths:
-    mirror_args = ['-history', '-limit', '9999', '-run', runnr, '-mirror', '-dst', dst_dir, path]
+for path, mirror_args in mirror_jobs:
     rez = DO_ccdb_query(mirror_args)
     exitcode = retf_print(rez)
     if exitcode != 0:

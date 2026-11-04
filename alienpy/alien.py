@@ -861,9 +861,9 @@ task name / detector name / [ / time [ / key = value]* ]
             filename = f'{q["Valid-From"]}/{dequote(q["ETag"])}'
         else:
             filename = q["filename"]
-            name, _, ext = filename.rpartition('.')
+            name, dot, ext = filename.rpartition('.')
             etag = dequote(q["ETag"])
-            filename = f"{name}_{etag}{'.' + ext if ext else ''}"
+            filename = f'{name}_{etag}.{ext}' if dot else f'{filename}_{etag}'
 
         q['Last-Modified-nice'] = unixtime2local(q['Last-Modified'])
         q['Valid-From-nice'] = unixtime2local(q['Valid-From']) if len(str(q['Valid-From'])) >= 10 else ''  # run based objects have run numbers, not unix time

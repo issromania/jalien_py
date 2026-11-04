@@ -57,7 +57,7 @@ from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token
 from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, CA_PATH
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
-                         deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, getCAcerts,
+                         deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
                          get_arg, get_arg_multiple, get_arg_value, get_lfn_key, import_aliases, is_help, list_remove_item,
                          md5, mk_xml_local, name2regex, queryML, signal_handler, unixtime2local, set_xattr_list)
 # commands stack tools
@@ -691,8 +691,12 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
         return {}
 
 
-def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, md5_expected: str = '', ssl_args: Optional[dict] = None) -> RET:
-    """Download src to dst over http(s): write to a temporary file, verify the md5 (if known) and then rename"""
+def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, md5_expected: str = '',
+                       mtime: Union[str, int, None] = None, shallow_check: bool = True, ssl_args: Optional[dict] = None) -> RET:
+    """Download src to dst over http(s): skip if dst is already valid; write to a temporary file, verify the md5 (if known) and then rename
+    validity of a present dst: size and mtime (ms) check if shallow_check (or md5 unknown), otherwise also md5"""
+    if size is not None and mtime is not None and fileIsValid(dst, size, mtime, md5_expected, shallow_check = shallow_check or not md5_expected).exitcode == 0:
+        return RET(0, f'{dst} already present and valid')
     if ssl_args is None: ssl_args = {}
     timeout = max(10, math.ceil(float(size) / 102400)) if size else 10  # expect at least 100 KiB/s
     dst_tmp = f'{dst}.part'
@@ -755,6 +759,7 @@ task name / detector name / [ / time [ / key = value]* ]
 -header "STRING" : add header declarations/filters to the requests sent to CCDB server
 -get             : download the specified object/objects - full path will be kept
 -http            : use http based replicas fo get/mirror downloads
+-md5             : validate already present files by md5 (default: size and modification time)
 -dst DST_DIR     : set a specific destination for download
 -mirror          : create CCDB snapshot as per specifications of CCDB server
 -report          : Give a report of object sizes for a given path
@@ -768,6 +773,7 @@ task name / detector name / [ / time [ / key = value]* ]
     get_arg(args, '-nicetime')  # documented option; human readable time is the default
     do_download = get_arg(args, '-get')
     do_http = get_arg(args, '-http')
+    do_md5 = get_arg(args, '-md5')
     do_mirror = get_arg(args, '-mirror')
     do_report = get_arg(args, '-report')
     do_history = get_arg(args, '-history')
@@ -935,14 +941,15 @@ task name / detector name / [ / time [ / key = value]* ]
         if download_list and do_http:
             for src, dst, q in download_list:
                 if DEBUG: logging.info('CCDB HTTP download:\n%s\n%s\n', src, dst)
-                ret_http = ccdb_http_download(src, dst, q.get('Content-Length'), q.get('Content-MD5', ''), requests_ssl_args if src.startswith(ccdb) else {})
+                ret_http = ccdb_http_download(src, dst, q.get('Content-Length'), q.get('Content-MD5', ''), q.get('Last-Modified'), not do_md5,
+                                              requests_ssl_args if src.startswith(ccdb) else {})
                 if ret_http.exitcode != 0: errors.append(ret_http.err)
         elif download_list:
             if not ALIENPY_GLOBAL_WB: ALIENPY_GLOBAL_WB = InitConnection(cmdlist_func = constructCmdList)
             if DEBUG: logging.info('CCDB XRootD download:\n%s\n', '\n'.join(f'{src} -> {dst}' for src, dst, _ in download_list))
             src_list = [src for src, _, _ in download_list]
             dst_list = [dst for _, dst, _ in download_list]
-            xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-retry', '2'], api_src = src_list, api_dst = dst_list)
+            xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-retry', '2'] + (['-f'] if do_md5 else []), api_src = src_list, api_dst = dst_list)
             xrd_out = xrdcp_ret.out
             if xrdcp_ret.exitcode != 0: errors.append(xrdcp_ret.err)
 

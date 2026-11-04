@@ -681,9 +681,13 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
     if not run: return {}
     if ssl_args is None: ssl_args = {}
     headers = { 'User-Agent': USER_AGENT_HTTP, 'Accept': 'application/json', 'Accept-encoding': 'gzip, deflate', 'Browse-Limit': '99'}
-    ccdb_query = requests.get(f'{ccdb}latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5, **ssl_args)
-    if ccdb_query.status_code != 200: return {}
-    return ccdb_query.json()
+    try:
+        ccdb_query = requests.get(f'{ccdb}latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5, **ssl_args)
+        if ccdb_query.status_code != 200: return {}
+        return ccdb_query.json()
+    except Exception:
+        logging.exception('ccdb_runinfo:: query failed for run %s', run)
+        return {}
 
 
 def DO_ccdb_query(args: list = None) -> RET:
@@ -801,10 +805,13 @@ task name / detector name / [ / time [ / key = value]* ]
         k, _, v = h_el.partition(':')
         headers[k.strip()] = v.strip()
 
-    ccdb_query = requests.get(f'{ccdb}{listing_type}{query_str}', headers = headers, timeout = 5, **requests_ssl_args)
-    if ccdb_query.status_code != 200:
-        return RET(1, '', f'Invalid answer (code {ccdb_query.status_code}) from query:\n{ccdb}{listing_type}{query_str}')
-    q_dict = ccdb_query.json()
+    try:
+        ccdb_query = requests.get(f'{ccdb}{listing_type}{query_str}', headers = headers, timeout = 5, **requests_ssl_args)
+        if ccdb_query.status_code != 200:
+            return RET(1, '', f'Invalid answer (code {ccdb_query.status_code}) from query:\n{ccdb}{listing_type}{query_str}')
+        q_dict = ccdb_query.json()
+    except Exception as e:
+        return RET(1, '', f'CCDB query failed:\n{ccdb}{listing_type}{query_str}\n{e!r}')
 
     if DEBUG: logging.info('CCDB query: %s\n', q_dict)
 

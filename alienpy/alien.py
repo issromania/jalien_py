@@ -690,6 +690,21 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
         return {}
 
 
+def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, ssl_args: Optional[dict] = None) -> RET:
+    """Download src to dst over http(s)"""
+    if ssl_args is None: ssl_args = {}
+    timeout = max(10, math.ceil(float(size) / 102400)) if size else 10  # expect at least 100 KiB/s
+    try:
+        with requests.get(src, headers = {'User-Agent': USER_AGENT_HTTP}, timeout = timeout, stream = True, **ssl_args) as response:
+            if response.status_code != 200: return RET(1, '', f'HTTP code {response.status_code} for {src}')
+            Path(os.path.dirname(dst)).mkdir(parents = True, exist_ok = True)
+            with open(dst, mode = 'wb') as f:
+                for chunk in response.iter_content(chunk_size = 1048576): f.write(chunk)
+    except Exception as e:
+        return RET(1, '', f'{src} -> {dst} failed: {e!r}')
+    return RET(0, f'{src} -> {dst}')
+
+
 def ccdb_write_properties(prop_filepath: str, q: dict) -> None:
     """Write the .properties file of a mirrored CCDB object (format as per CCDB server snapshot)"""
     skip_keys = ('Last-Modified-nice', 'Valid-From-nice', 'Valid-Until-nice', 'Lifetime', 'replicas', 'path', 'ETag', 'Valid-From', 'Content-Length')
@@ -909,21 +924,9 @@ task name / detector name / [ / time [ / key = value]* ]
         xrd_out = ''
         if download_list and do_http:
             for src, dst, q in download_list:
-                timeout = 10
-                if 'Content-Length' in q:
-                    size = q['Content-Length']
-                    timeout_estimated = float(size)/float(102400)  # expect at least 100 KiB/s
-                    if timeout_estimated > timeout:
-                        timeout = math.ceil(timeout_estimated)
                 if DEBUG: logging.info('CCDB HTTP download:\n%s\n%s\n', src, dst)
-                response = requests.get(src, timeout = timeout, stream = True)
-                if response.status_code == 200:
-                    Path(os.path.dirname(dst)).mkdir(parents = True, exist_ok = True)
-                    with open(dst, mode = "wb") as f:
-                        for chunk in response.iter_content(chunk_size = 8192):
-                            f.write(chunk)
-                else:
-                    errors.append(f'HTTP code {response.status_code} for {src}')
+                ret_http = ccdb_http_download(src, dst, q.get('Content-Length'), requests_ssl_args if src.startswith(ccdb) else {})
+                if ret_http.exitcode != 0: errors.append(ret_http.err)
         elif download_list:
             if not ALIENPY_GLOBAL_WB: ALIENPY_GLOBAL_WB = InitConnection(cmdlist_func = constructCmdList)
             if DEBUG: logging.info('CCDB XRootD download:\n%s\n', '\n'.join(f'{src} -> {dst}' for src, dst, _ in download_list))

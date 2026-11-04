@@ -754,7 +754,7 @@ task name / detector name / [ / time [ / key = value]* ]
 -objtime         : request a given objtime
 -host            : specify other ccdb server than alice-ccdb.cern.ch
 -history         : use browse to list the whole history of the object
--limit N         : limit the history to latest N elements; default = 10
+-limit N         : limit the history to latest N elements; default = 10 (no limit for -report)
 -unixtime        : print the unixtime instead of human time
 -header "STRING" : add header declarations/filters to the requests sent to CCDB server
 -get             : download the specified object/objects - full path will be kept
@@ -798,7 +798,7 @@ task name / detector name / [ / time [ / key = value]* ]
 
     do_unixtime = do_mirror or do_unixtime
 
-    if not limit_results: limit_results = 10
+    if not limit_results: limit_results = 0 if do_report else 10  # the report totals need all the objects; Browse-Limit 0 means no limit
     if not str(limit_results).isdigit(): return RET(22, '', f'-limit requires a positive integer, got: {limit_results}')
 
     if not dest_arg: dest_arg = '.'

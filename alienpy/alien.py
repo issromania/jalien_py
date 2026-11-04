@@ -902,8 +902,10 @@ task name / detector name / [ / time [ / key = value]* ]
         src = ccdb_select_src(q.get('replicas', []), ccdb, do_http)
         if src: download_list.append((src, f'file:{dst_filepath}' if src.startswith('alien:') else dst_filepath, q))
 
-    if (do_download or do_mirror) and len(download_list) > 0:
-        if do_http:
+    if do_download or do_mirror:
+        errors = []
+        xrd_out = ''
+        if download_list and do_http:
             for src, dst, q in download_list:
                 timeout = 10
                 if 'Content-Length' in q:
@@ -918,25 +920,32 @@ task name / detector name / [ / time [ / key = value]* ]
                     with open(dst, mode = "wb") as f:
                         for chunk in response.iter_content(chunk_size = 8192):
                             f.write(chunk)
-            ret_obj = RET(exitcode=0, out=f'{len(download_list)} files downloaded via http', err='', ansdict = q_dict)
-        else:
+                else:
+                    errors.append(f'HTTP code {response.status_code} for {src}')
+        elif download_list:
             if not ALIENPY_GLOBAL_WB: ALIENPY_GLOBAL_WB = InitConnection(cmdlist_func = constructCmdList)
             if DEBUG: logging.info('CCDB XRootD download:\n%s\n', '\n'.join(f'{src} -> {dst}' for src, dst, _ in download_list))
             src_list = [src for src, _, _ in download_list]
             dst_list = [dst for _, dst, _ in download_list]
             xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-parent', '99', '-retry', '2'], api_src = src_list, api_dst = dst_list)
-            ret_obj = dataclasses.replace(xrdcp_ret, ansdict = q_dict)  # noqa: R504
+            xrd_out = xrdcp_ret.out
+            if xrdcp_ret.exitcode != 0: errors.append(xrdcp_ret.err)
 
         # set xattr attributes (and .properties file for mirror) for the files present after transfer
+        present_nr = 0
         for _, dst, q in download_list:
             list_of_key_to_remove = ["Content-Type", "UploadedBy", "UploadedFrom", "replicas"]
             local_dst = dst.removeprefix('file:')
             if os.path.exists(local_dst):
+                present_nr += 1
                 if do_mirror: ccdb_write_properties(f'{local_dst}.properties', q)
                 q_clean = {key: value for key, value in q.items() if key not in list_of_key_to_remove}
                 _ = set_xattr_list(local_dst, q_clean)
 
-        return ret_obj
+        objects_nr = len(q_dict['objects'])
+        msg = f'{present_nr}/{objects_nr} objects present in {dest_arg}'
+        if xrd_out: msg = f'{xrd_out}\n{msg}'
+        return RET(0 if present_nr == objects_nr else 1, msg, '\n'.join(errors), q_dict)
 
     msg = None
     if msg_obj_list:

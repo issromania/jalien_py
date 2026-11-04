@@ -758,7 +758,7 @@ task name / detector name / [ / time [ / key = value]* ]
 -unixtime        : print the unixtime instead of human time
 -header "STRING" : add header declarations/filters to the requests sent to CCDB server
 -get             : download the specified object/objects - full path will be kept
--http            : use http based replicas fo get/mirror downloads
+-http            : use http based replicas for get/mirror downloads (automatic if no valid token is found)
 -md5             : validate already present files by md5 (default: size and modification time)
 -dst DST_DIR     : set a specific destination for download
 -mirror          : create CCDB snapshot as per specifications of CCDB server
@@ -772,7 +772,7 @@ task name / detector name / [ / time [ / key = value]* ]
     do_unixtime = get_arg(args, '-unixtime')
     get_arg(args, '-nicetime')  # documented option; human readable time is the default
     do_download = get_arg(args, '-get')
-    do_http = get_arg(args, '-http')
+    do_http = get_arg(args, '-http') or not AlienSessionInfo['token_cert']  # without a valid token the alien replicas cannot be accessed
     do_md5 = get_arg(args, '-md5')
     do_mirror = get_arg(args, '-mirror')
     do_report = get_arg(args, '-report')

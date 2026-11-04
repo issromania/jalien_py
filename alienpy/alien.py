@@ -884,7 +884,7 @@ task name / detector name / [ / time [ / key = value]* ]
             msg = f'{msg}\n{folder["name"]:<40}{folder["ownFiles"]:>12}{GetHumanReadableSize(folder["ownSize"]):>12}{folder["filesInSubfolders"]:>12}{GetHumanReadableSize(folder["sizeOfSubfolders"]):>14}'
 
         if q_dict["objects"]:
-            total_obj = len(q_dict["objects"])
+            total_obj += len(q_dict["objects"])
             for obj in q_dict["objects"]:
                 total_size += int(obj["size"])
 

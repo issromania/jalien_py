@@ -691,7 +691,7 @@ def get_xattr_dict(path:str) -> dict:
 
 def set_xattr(path: str, attr_arg: str, value_arg: str) -> bool:
     '''Set an xattr to a local file'''
-    if not path or not attr_arg or not value_arg or not os.path.isfile(path): return False
+    if not path or not attr_arg or value_arg is None or not os.path.isfile(path): return False
     attr = f'user.{attr_arg}'.encode()
     value = str(value_arg).encode()
     try:

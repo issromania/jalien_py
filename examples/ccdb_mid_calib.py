@@ -36,6 +36,6 @@ for obj in obj_list:
     rez = DO_ccdb_query([obj])
     for q in rez.ansdict['objects']:
         run = q.get("runNumber", '-1')
-        table.add_row(q["path"].replace(common_dir,""), str(run), unixtime2local(q["Content-Length"]), unixtime2local(q["Last-Modified"]), str(q["Valid-Until"]))
+        table.add_row(q["path"].replace(common_dir,""), str(run), str(q["Content-Length"]), unixtime2local(q["Last-Modified"]), unixtime2local(q["Valid-Until"]))
 console = Console()
 console.print(table)

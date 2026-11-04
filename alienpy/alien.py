@@ -15,6 +15,7 @@ import dataclasses
 import collections
 import datetime
 import difflib
+import hashlib
 import json
 import math
 import signal
@@ -690,17 +691,26 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
         return {}
 
 
-def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, ssl_args: Optional[dict] = None) -> RET:
-    """Download src to dst over http(s)"""
+def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, md5_expected: str = '', ssl_args: Optional[dict] = None) -> RET:
+    """Download src to dst over http(s): write to a temporary file, verify the md5 (if known) and then rename"""
     if ssl_args is None: ssl_args = {}
     timeout = max(10, math.ceil(float(size) / 102400)) if size else 10  # expect at least 100 KiB/s
+    dst_tmp = f'{dst}.part'
+    hasher = hashlib.md5(usedforsecurity = False)
     try:
         with requests.get(src, headers = {'User-Agent': USER_AGENT_HTTP}, timeout = timeout, stream = True, **ssl_args) as response:
             if response.status_code != 200: return RET(1, '', f'HTTP code {response.status_code} for {src}')
             Path(os.path.dirname(dst)).mkdir(parents = True, exist_ok = True)
-            with open(dst, mode = 'wb') as f:
-                for chunk in response.iter_content(chunk_size = 1048576): f.write(chunk)
+            with open(dst_tmp, mode = 'wb') as f:
+                for chunk in response.iter_content(chunk_size = 1048576):
+                    f.write(chunk)
+                    hasher.update(chunk)
+        if md5_expected and hasher.hexdigest() != md5_expected:
+            os.remove(dst_tmp)
+            return RET(1, '', f'{src} -> {dst} failed: md5 mismatch')
+        os.replace(dst_tmp, dst)
     except Exception as e:
+        if os.path.exists(dst_tmp): os.remove(dst_tmp)
         return RET(1, '', f'{src} -> {dst} failed: {e!r}')
     return RET(0, f'{src} -> {dst}')
 
@@ -925,7 +935,7 @@ task name / detector name / [ / time [ / key = value]* ]
         if download_list and do_http:
             for src, dst, q in download_list:
                 if DEBUG: logging.info('CCDB HTTP download:\n%s\n%s\n', src, dst)
-                ret_http = ccdb_http_download(src, dst, q.get('Content-Length'), requests_ssl_args if src.startswith(ccdb) else {})
+                ret_http = ccdb_http_download(src, dst, q.get('Content-Length'), q.get('Content-MD5', ''), requests_ssl_args if src.startswith(ccdb) else {})
                 if ret_http.exitcode != 0: errors.append(ret_http.err)
         elif download_list:
             if not ALIENPY_GLOBAL_WB: ALIENPY_GLOBAL_WB = InitConnection(cmdlist_func = constructCmdList)

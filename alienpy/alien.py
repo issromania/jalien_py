@@ -897,7 +897,7 @@ task name / detector name / [ / time [ / key = value]* ]
                     if key == 'filename': key = 'OriginalFileName'
                     f.write(f'{key}={v}\n')
 
-        if not do_download or not do_mirror:
+        if not do_download and not do_mirror:
             msg_obj_list.append(f'{q["filename"]}{" " * 2}{q.get("ObjectType", "TYPE NOT FOUND")}{" " * 2}'
                                 f'\"{q["Valid-From"] if do_unixtime else q["Valid-From-nice"]}\"{" " * 2}'
                                 f'\"{q["Valid-Until"] if do_unixtime else q["Valid-Until-nice"]}\"{" " * 2}'

@@ -690,6 +690,15 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
         return {}
 
 
+def ccdb_select_src(replicas: list, ccdb: str, use_http: bool = False) -> str:
+    """Select one download source from the CCDB replicas list: the http one if use_http, otherwise the alien one"""
+    if not use_http: return next((r for r in replicas if r.startswith('alien:')), '')
+    http_src = next((r for r in replicas if r.startswith(('http://', 'https://'))), '')
+    if http_src: return http_src
+    rel_src = next((r for r in replicas if r.startswith(('/', 'download'))), '')
+    return f'{ccdb}{rel_src.lstrip("/")}' if rel_src else ''  # ccdb always ends with /
+
+
 def DO_ccdb_query(args: list = None) -> RET:
     """Query CCDB for object data"""
     global ALIENPY_GLOBAL_WB
@@ -903,20 +912,9 @@ task name / detector name / [ / time [ / key = value]* ]
                                 f'\"{q["Valid-Until"] if do_unixtime else q["Valid-Until-nice"]}\"{" " * 2}'
                                 f'{q["Lifetime"]}')
 
-        # create list of src,dst pairs to be downloaded
-        if 'replicas' in q:
-            for i in q['replicas']:
-                src = ''
-                if do_http:  # http source was requested
-                    if i.startswith('http'):
-                        src = i
-                    elif i.startswith('/') or i.startswith('download'):
-                        src = f'{ccdb}{i.lstrip("/")}'
-                else:
-                    if i.startswith('alien'):
-                        src = i
-                        dst_filepath = f'file:{dst_filepath}'
-                if src: download_list.append((src, dst_filepath, q))
+        # create list of src,dst pairs to be downloaded: exactly one source per object
+        src = ccdb_select_src(q.get('replicas', []), ccdb, do_http)
+        if src: download_list.append((src, f'file:{dst_filepath}' if src.startswith('alien:') else dst_filepath, q))
 
     if (do_download or do_mirror) and len(download_list) > 0:
         if do_http:

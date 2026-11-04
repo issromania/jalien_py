@@ -676,11 +676,12 @@ def DO_jobInfo(wb: WebSocketClientProtocol, args: list = None) -> RET:
     return RET(0, f'{os.linesep}'.join(job_list_messages), '', job_processed_list)
 
 
-def ccdb_runinfo(run: str = '') -> dict:
-    """Get the CCDB registered information for run number"""
+def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_args: Optional[dict] = None) -> dict:
+    """Get the CCDB registered information for run number from the ccdb server (url ending with /)"""
     if not run: return {}
+    if ssl_args is None: ssl_args = {}
     headers = { 'User-Agent': USER_AGENT_HTTP, 'Accept': 'application/json', 'Accept-encoding': 'gzip, deflate', 'Browse-Limit': '99'}
-    ccdb_query = requests.get(f'http://alice-ccdb.cern.ch/latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5)
+    ccdb_query = requests.get(f'{ccdb}latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5, **ssl_args)
     if ccdb_query.status_code != 200: return {}
     return ccdb_query.json()
 
@@ -776,7 +777,7 @@ task name / detector name / [ / time [ / key = value]* ]
 
     if not ccdb_time:
         if run_nr:
-            run_info = ccdb_runinfo(run_nr)
+            run_info = ccdb_runinfo(run_nr, ccdb, requests_ssl_args)
             if not run_info.get('objects'):
                 return RET(1, '', f'Could not obtain SOR time for specified run number {run_nr}')
             ccdb_time = run_info['objects'][0]['SOR']

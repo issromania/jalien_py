@@ -702,7 +702,7 @@ task name / detector name / start time [ / UUID]
 or
 task name / detector name / [ / time [ / key = value]* ]
 
--run RUN_NR      : filter for a specific run (converts to /runNumber=RUN_NR})
+-run RUN_NR      : filter for a specific run (uses the SOR time of the run as query time)
 -objtime         : request a given objtime
 -host            : specify other ccdb server than alice-ccdb.cern.ch
 -history         : use browse to list the whole history of the object

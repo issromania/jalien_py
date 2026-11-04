@@ -911,7 +911,7 @@ task name / detector name / [ / time [ / key = value]* ]
                     if i.startswith('http'):
                         src = i
                     elif i.startswith('/') or i.startswith('download'):
-                        src = f'{ccdb}/{i}'
+                        src = f'{ccdb}{i.lstrip("/")}'
                 else:
                     if i.startswith('alien'):
                         src = i

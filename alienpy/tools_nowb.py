@@ -3,6 +3,7 @@
 import ast
 import atexit
 import datetime
+import decimal
 import json
 import re
 from typing import Any, Optional, Union
@@ -95,37 +96,38 @@ def time_str2unixmili(time_arg: Union[str, int, None]) -> int:
         return int(-1)
 
 
-def unixtime2local(timestamp: Union[str, int], decimals: bool = True) -> str:
-    """Convert unix time to a nice custom format"""
-    timestr = str(timestamp)
-    if len(timestr) < 10: return ''
-    micros = None
-    millis = None
-    time_decimals = ''
-    if len(timestr) > 10:
-        time_decimals = timestr[10:]
-        if len(time_decimals) <= 3:
-            time_decimals = float(time_decimals.ljust(3, '0')) * 1000
-            millis = datetime.timedelta(milliseconds=int(time_decimals))
-        else:
-            time_decimals = float(time_decimals.ljust(6, '0')) *1000000
-            micros = datetime.timedelta(microseconds=int(time_decimals))
-
-    unixtime = timestr[:10]
-    utc_time = datetime.datetime.fromtimestamp(int(unixtime), datetime.timezone.utc)
-    local_time = utc_time.astimezone()
-    if decimals and millis:
-        return f'{(local_time + millis).strftime("%Y-%m-%d %H:%M:%S")}.{time_decimals}{local_time.strftime("%z")}'
-    if decimals and micros:
-        return (local_time + micros).strftime("%Y-%m-%d %H:%M:%S.%f%z")  # (%Z)"))
-    return local_time.strftime("%Y-%m-%d %H:%M:%S%z")  # (%Z)"))
+def unixtime2local(timestamp: Union[str, int, float], decimals: bool = True) -> str:
+    """Convert unix time to a nice custom format; the first 10 digits are seconds, any further digits are the fraction of second"""
+    timestr = format(decimal.Decimal(repr(float(timestamp))), 'f') if isinstance(timestamp, float) else str(timestamp).strip()  # repr: shortest round-trip digits; 'f': no exponent
+    if not re.fullmatch(r'(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?', timestr):  # not an unsigned ASCII decimal number
+        logging.error('unixtime2local:: invalid input: %r', timestamp)
+        return ''
+    if 'e' in timestr or 'E' in timestr:  # float written as string in exponent notation
+        try:
+            exp_value = decimal.Decimal(timestr)
+        except decimal.InvalidOperation:  # exponent beyond the limits of the decimal module, so out of range
+            logging.error('unixtime2local:: invalid input: %r', timestamp)
+            return ''
+        if not 9 <= exp_value.adjusted() <= 18:  # same 10..19 integer digits range as below; checked before expansion to bound its size
+            logging.error('unixtime2local:: invalid input: %r', timestamp)
+            return ''
+        timestr = format(exp_value, 'f')
+    int_part, _, frac_part = timestr.partition('.')
+    if not 10 <= len(int_part) <= 19:  # less than 10 digits of seconds is not unix time; more than 19 is beyond ns based values
+        logging.error('unixtime2local:: invalid input: %r', timestamp)
+        return ''
+    timestr = int_part + (frac_part if frac_part.strip('0') else '')  # an all-zero part after the dot (e.g. float .0) adds no digits
+    local_time = datetime.datetime.fromtimestamp(int(timestr[:10]), datetime.timezone.utc).astimezone()
+    if not decimals: return local_time.strftime('%Y-%m-%d %H:%M:%S%z')
+    fraction = timestr[10:] if timestr[10:].strip('0') else '0'
+    return f'{local_time.strftime("%Y-%m-%d %H:%M:%S")}.{fraction}{local_time.strftime("%z")}'
 
 
 def convert_time(str_line: str, color: bool = True) -> str:
     """Convert the first 10 digit unix time like string from str argument to a nice time"""
     timestamp = re.findall(r"^(\d{10}) \[.*", str_line)
     if timestamp:
-        nice_timestamp = f'{PrintColor(COLORS.BIGreen)}{unixtime2local(timestamp[0])}{PrintColor(COLORS.ColorReset)}' if color else unixtime2local(timestamp[0])
+        nice_timestamp = f'{PrintColor(COLORS.BIGreen)}{unixtime2local(timestamp[0], decimals = False)}{PrintColor(COLORS.ColorReset)}' if color else unixtime2local(timestamp[0], decimals = False)
         return str_line.replace(str(timestamp[0]), nice_timestamp)
     return str_line
 

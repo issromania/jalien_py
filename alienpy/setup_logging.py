@@ -66,6 +66,8 @@ def setup_logging(debug: bool = False, debug_file:str = f'{USER_HOME}/alien_py.l
         logging.getLogger('async_stagger').setLevel(MSG_LVL)
 
 
+setup_logging(bool(DEBUG), DEBUG_FILE)  # configure before any other alienpy module can call logging.*()
+
 if __name__ == '__main__':
     print('This file should not be executed!', file = sys.stderr, flush = True)
     sys.exit(95)

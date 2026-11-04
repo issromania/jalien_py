@@ -777,7 +777,7 @@ task name / detector name / [ / time [ / key = value]* ]
     if not ccdb_time:
         if run_nr:
             run_info = ccdb_runinfo(run_nr)
-            if 'objects' not in run_info or 'objects' not in run_info['objects']:
+            if not run_info.get('objects'):
                 return RET(1, '', f'Could not obtain SOR time for specified run number {run_nr}')
             ccdb_time = run_info['objects'][0]['SOR']
         elif obj_time:

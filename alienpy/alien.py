@@ -801,7 +801,7 @@ task name / detector name / [ / time [ / key = value]* ]
     key_selection = '/'.join(key_selection_list)
     query_str = f'{ccdb_obj_path}{"/" if ccdb_time else ""}{ccdb_time}{"/" if key_selection else ""}{key_selection}'
 
-    if do_report: query_str = f'{query_str}{"?" if "?" not in query_str else ""}report=true'
+    if do_report: query_str = f'{query_str}{"&" if "?" in query_str else "?"}report=true'
     if DEBUG: logging.info('CCDB path: %s', query_str)
 
     # if do_mirror: limit_results = '999999'

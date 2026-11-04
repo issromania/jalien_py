@@ -763,6 +763,8 @@ task name / detector name / [ / time [ / key = value]* ]
 -dst DST_DIR     : set a specific destination for download
 -mirror          : create CCDB snapshot as per specifications of CCDB server
 -report          : Give a report of object sizes for a given path
+-sort            : sort the -report entries by their total size (ownSize + sizeSub), largest first
+-firstN N        : show only the first N -report entries (implies -sort); TOTAL is computed only over them
 ''' )
 
     listing_type = 'latest/'
@@ -776,6 +778,8 @@ task name / detector name / [ / time [ / key = value]* ]
     do_md5 = get_arg(args, '-md5')
     do_mirror = get_arg(args, '-mirror')
     do_report = get_arg(args, '-report')
+    first_n = get_arg_value(args, '-firstN')
+    do_sort = get_arg(args, '-sort') or bool(first_n)
     do_history = get_arg(args, '-history')
     run_nr = get_arg_value(args, '-run')
     obj_time = get_arg_value(args, '-objtime')
@@ -793,6 +797,9 @@ task name / detector name / [ / time [ / key = value]* ]
 
     if run_nr and obj_time:
         return RET(1, '', '-run and -objtime are conflicting options')
+
+    if do_sort and not do_report: return RET(22, '', '-sort/-firstN are valid only with -report')
+    if first_n and not (str(first_n).isdigit() and int(first_n) > 0): return RET(22, '', f'-firstN requires a positive integer, got: {first_n}')
 
     if do_report or do_history: listing_type = 'browse/'
 
@@ -878,17 +885,20 @@ task name / detector name / [ / time [ / key = value]* ]
         total_obj = int(0)
 
         msg = f'{"Name":<40}{"ownFiles":>12}{"ownSize":>12}{"filesSub":>12}{"sizeSub":>14}'
-        for folder in q_dict["subfolders"]:
+        folders = q_dict["subfolders"]
+        if do_sort: folders = sorted(folders, key = lambda folder: int(folder["ownSize"]) + int(folder["sizeOfSubfolders"]), reverse = True)  # sizes are in bytes
+        if first_n: folders = folders[:int(first_n)]
+        for folder in folders:
             total_size += int(folder["ownSize"]) + int(folder["sizeOfSubfolders"])
             total_obj += int(folder["ownFiles"]) + int(folder["filesInSubfolders"])
             msg = f'{msg}\n{folder["name"]:<40}{folder["ownFiles"]:>12}{GetHumanReadableSize(folder["ownSize"]):>12}{folder["filesInSubfolders"]:>12}{GetHumanReadableSize(folder["sizeOfSubfolders"]):>14}'
 
-        if q_dict["objects"]:
+        if q_dict["objects"] and not first_n:  # with -firstN the total covers only the listed entries
             total_obj += len(q_dict["objects"])
             for obj in q_dict["objects"]:
                 total_size += int(obj["size"])
 
-        msg = f'{msg}\n{"TOTAL":^40}{"-":>12}{"-":>12}{total_obj:>12}{GetHumanReadableSize(total_size, 3):>14}'
+        msg = f'{msg}\n{f"TOTAL (first {len(folders)})" if first_n else "TOTAL":^40}{"-":>12}{"-":>12}{total_obj:>12}{GetHumanReadableSize(total_size, 3):>14}'
         return RET(0, msg, '', q_dict)
 
     dir_list = [f'{d}/' for d in q_dict['subfolders']]

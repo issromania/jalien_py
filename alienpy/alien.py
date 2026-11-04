@@ -749,6 +749,7 @@ task name / detector name / [ / time [ / key = value]* ]
     do_unixtime = do_mirror or do_unixtime
 
     if not limit_results: limit_results = 10
+    if not str(limit_results).isdigit(): return RET(22, '', f'-limit requires a positive integer, got: {limit_results}')
 
     if not dest_arg: dest_arg = '.'
     if not dest_arg.endswith('/'): dest_arg = f'{dest_arg}/'

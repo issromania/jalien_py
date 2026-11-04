@@ -942,7 +942,7 @@ task name / detector name / [ / time [ / key = value]* ]
             if DEBUG: logging.info('CCDB XRootD download:\n%s\n', '\n'.join(f'{src} -> {dst}' for src, dst, _ in download_list))
             src_list = [src for src, _, _ in download_list]
             dst_list = [dst for _, dst, _ in download_list]
-            xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-parent', '99', '-retry', '2'], api_src = src_list, api_dst = dst_list)
+            xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-retry', '2'], api_src = src_list, api_dst = dst_list)
             xrd_out = xrdcp_ret.out
             if xrdcp_ret.exitcode != 0: errors.append(xrdcp_ret.err)
 

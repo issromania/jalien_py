@@ -690,6 +690,16 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
         return {}
 
 
+def ccdb_write_properties(prop_filepath: str, q: dict) -> None:
+    """Write the .properties file of a mirrored CCDB object (format as per CCDB server snapshot)"""
+    skip_keys = ('Last-Modified-nice', 'Valid-From-nice', 'Valid-Until-nice', 'Lifetime', 'replicas', 'path', 'ETag', 'Valid-From', 'Content-Length')
+    rename_keys = {'Created': 'CreateTime', 'Valid-Until': 'ValidUntil', 'filename': 'OriginalFileName'}
+    with open(prop_filepath, 'w', encoding = 'utf8') as f:
+        for k, v in q.items():
+            if k in skip_keys: continue
+            f.write(f'{rename_keys.get(k, k)}={v}\n')
+
+
 def ccdb_select_src(replicas: list, ccdb: str, use_http: bool = False) -> str:
     """Select one download source from the CCDB replicas list: the http one if use_http, otherwise the alien one"""
     if not use_http: return next((r for r in replicas if r.startswith('alien:')), '')
@@ -882,30 +892,6 @@ task name / detector name / [ / time [ / key = value]* ]
         # destination filename
         dst_filepath = f'{dest_arg}{q["path"]}/{filename}'
 
-        # create properties file
-        if do_mirror:
-            prop_filepath = f'{dst_filepath}.properties'
-            Path(os.path.dirname(prop_filepath)).mkdir(parents = True, exist_ok = True)
-            with open(prop_filepath, "w", encoding = 'utf8') as f:
-                for k, v in q.items():
-                    key = k
-                    # do not write my additions
-                    if key == 'Last-Modified-nice': continue
-                    if key == 'Valid-From-nice': continue
-                    if key == 'Valid-Until-nice': continue
-                    if key == 'Lifetime': continue
-
-                    # properties format, Costin dixit
-                    if key == 'replicas': continue
-                    if key == 'path': continue
-                    if key == 'ETag': continue
-                    if key == 'Valid-From': continue
-                    if key == 'Content-Length': continue
-                    if key == 'Created': key = 'CreateTime'
-                    if key == 'Valid-Until': key = 'ValidUntil'
-                    if key == 'filename': key = 'OriginalFileName'
-                    f.write(f'{key}={v}\n')
-
         if not do_download and not do_mirror:
             msg_obj_list.append(f'{q["filename"]}{" " * 2}{q.get("ObjectType", "TYPE NOT FOUND")}{" " * 2}'
                                 f'\"{q["Valid-From"] if do_unixtime else q["Valid-From-nice"]}\"{" " * 2}'
@@ -941,11 +927,12 @@ task name / detector name / [ / time [ / key = value]* ]
             xrdcp_ret = DO_XrootdCp(ALIENPY_GLOBAL_WB, xrd_copy_command = ['-parent', '99', '-retry', '2'], api_src = src_list, api_dst = dst_list)
             ret_obj = dataclasses.replace(xrdcp_ret, ansdict = q_dict)  # noqa: R504
 
-        # set xattr attributes for downloaded files
+        # set xattr attributes (and .properties file for mirror) for the files present after transfer
         for _, dst, q in download_list:
             list_of_key_to_remove = ["Content-Type", "UploadedBy", "UploadedFrom", "replicas"]
             local_dst = dst.removeprefix('file:')
             if os.path.exists(local_dst):
+                if do_mirror: ccdb_write_properties(f'{local_dst}.properties', q)
                 q_clean = {key: value for key, value in q.items() if key not in list_of_key_to_remove}
                 _ = set_xattr_list(local_dst, q_clean)
 

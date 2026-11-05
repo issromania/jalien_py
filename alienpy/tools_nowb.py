@@ -412,7 +412,7 @@ def GetHumanReadableSize(size_arg: Union[int, str], precision: int = 2) -> str:
     size = float(size_arg)
     suffixes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
     suffixIndex = 0
-    while size > 1024 and suffixIndex < 6:
+    while size > 1024 and suffixIndex < len(suffixes) - 1:
         suffixIndex += 1  # increment the index of the suffix
         size = size / 1024.0  # apply the division
     return f'{size:.{precision}f} {suffixes[suffixIndex]}'

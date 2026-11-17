@@ -858,8 +858,9 @@ def list_files_local(search_dir: str, pattern: Union[re.Pattern[str], str, None]
     except RuntimeError:
         return RET(2, '', f'Loop encountered along the resolution of {search_dir}')
 
-    filter_args_list = None
+    filter_args_list = []
     if find_args: filter_args_list = find_args.split()  # for local files listing we have only filtering options
+    exclude_regex_list = [re.compile(ex_re) for ex_re in get_arg_value_multiple(filter_args_list, '-exclude_re')]  # exclusion regexes, as in list_files_grid
 
     file_list = None  # make a list of filepaths (that match a regex or a glob)
     if is_single_file:
@@ -878,7 +879,7 @@ def list_files_local(search_dir: str, pattern: Union[re.Pattern[str], str, None]
     results_list_filtered = []
     # items that pass the conditions are the actual/final results
     for found_lfn_dict in results_list:  # parse results to apply filters
-        if not filter_file_prop(found_lfn_dict, directory, filter_args_list, regex): continue
+        if not filter_file_prop(found_lfn_dict, directory, filter_args_list, exclude_regex_list): continue
         # at this point all filters were passed
         results_list_filtered.append(found_lfn_dict)
 
@@ -921,6 +922,8 @@ def filter_file_prop(f_obj: dict, base_dir: str, find_opts: Union[str, list, Non
     if f_obj['lfn'].endswith('.'): return False
 
     if not find_opts and not compiled_regex_list: return True
+    if not find_opts: find_opts = []
+    if not compiled_regex_list: compiled_regex_list = []
     opts = find_opts.split() if isinstance(find_opts, str) else find_opts.copy()
 
     lfn = get_lfn_key(f_obj)

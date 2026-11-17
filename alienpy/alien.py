@@ -385,7 +385,7 @@ def DO_xrd_stats(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RE
 
     results_dict = {'results': stats_list}
     msg_all = '\n'.join(msg_list)
-    _exitcode = 1 if not results_dict else 0
+    _exitcode = 1 if not stats_list else 0
     return RET(_exitcode, msg_all, '', results_dict)
 
 

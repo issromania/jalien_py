@@ -53,7 +53,7 @@ async def create_socket(host: str = 'localhost', port: Union[str, int] = '8097',
     socket_endpoint = None
 
     PROTO = socket.IPPROTO_TCP
-    socket.setdefaulttimeout(0.3)  # 300 milisec should be a good timeout for socket creation
+    CONNECT_TIMEOUT = 0.3  # 300 milisec should be a good timeout for socket creation; do NOT use socket.setdefaulttimeout (process wide)
 
     init_begin_socket = None
     if DEBUG:
@@ -88,7 +88,7 @@ async def create_socket(host: str = 'localhost', port: Union[str, int] = '8097',
         resolved_addr_list = socket.getaddrinfo(host, port, family = ALIENPY_ADDRESS_FAMILY, proto = PROTO)
         for addr in resolved_addr_list:
             try:
-                socket_endpoint = socket.create_connection((addr[-1][0], addr[-1][1]))
+                socket_endpoint = socket.create_connection((addr[-1][0], addr[-1][1]), timeout = CONNECT_TIMEOUT)
                 break
             except Exception as e:
                 msg = f'Could NOT establish connection (TCP socket)(socket.create_connection) to {host}:{port}\n{e!r}\n'

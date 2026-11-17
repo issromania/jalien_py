@@ -147,7 +147,7 @@ def AlienConnect(wb: Optional[WebSocketClientProtocol] = None, token_args: Optio
     return wb
 
 
-def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Optional[list] = None, use_usercert: bool = False, localConnect: bool = False, cmdlist_func: Optional[Callable] = None) -> WebSocketClientProtocol:
+def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Optional[list] = None, use_usercert: bool = False, localConnect: bool = False, cmdlist_func: Optional[Callable] = None, gen_token: bool = True) -> WebSocketClientProtocol:
     """Create a session to AliEn services, including session globals and token regeneration"""
     global ALIENPY_GLOBAL_WB
 
@@ -189,7 +189,7 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
         if AlienSessionInfo['currentdir']: cd(wb, AlienSessionInfo['currentdir'], 'log nocheck')
 
         # if usercert connection always regenerate token if connected with usercert
-        if AlienSessionInfo['use_usercert'] and token(wb, token_args) != 0:
+        if gen_token and AlienSessionInfo['use_usercert'] and token(wb, token_args) != 0:
             print_err(f'The token could not be created! check the logfile {DEBUG_FILE}')
 
     return wb
@@ -474,7 +474,7 @@ def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> Web
     if 'AlienSessionInfo' in globals() and not AlienSessionInfo['use_usercert']:
         _ = wb_close(wb, code = 1000, reason = 'Lets connect with usercert to be able to generate token')
         try:
-            wb_usercert = InitConnection(wb, args, use_usercert = True)  # we have to reconnect with the new token
+            wb_usercert = InitConnection(wb, args, use_usercert = True, gen_token = False)  # usercert connection; the token is generated below
         except Exception:
             logging.debug(traceback.format_exc())
             return None  # we failed usercert connection

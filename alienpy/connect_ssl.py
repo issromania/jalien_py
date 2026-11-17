@@ -7,10 +7,10 @@ import logging
 import uuid
 import tempfile
 import ssl
-from typing import Optional
 
 try:
     from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
 except Exception:
     print("cryptography module could not be imported! Make sure you can do:\npython3 -c 'import cryptography'", file = sys.stderr, flush = True)
     sys.exit(1)
@@ -216,6 +216,41 @@ def renewCredFilesInfo() -> CertsInfo:
     return CertsInfo(user_cert, user_key, token_cert, token_key)
 
 
+def cert_key_load_reason(e: Exception, cert: str, key: str) -> str:
+    """Return a human readable reason for which SSLContext.load_cert_chain(cert, key) failed with exception e; it never prompts for a passphrase"""
+    ssl_reason = getattr(e, 'reason', None) if isinstance(e, ssl.SSLError) else None
+    if ssl_reason == 'KEY_VALUES_MISMATCH':  # authoritative; also means that a passphrase (if any) was accepted
+        return f'the private key {key} does NOT match the certificate {cert}'
+    if ssl_reason and (ssl_reason.endswith('_TOO_SMALL') or ssl_reason.endswith('_TOO_WEAK')):
+        return f'OpenSSL security level of this system rejects the certificate (key size or signature digest too weak): {e}'
+
+    try:
+        with open(cert, 'rb') as f: cert_bytes = f.read()
+    except OSError as err:
+        return f'certificate file {cert} cannot be read: {err.strerror}'
+    try:
+        x509cert = x509.load_pem_x509_certificate(cert_bytes)
+    except Exception as err:
+        return f'certificate file {cert} is not a valid PEM certificate: {err}'
+
+    try:
+        with open(key, 'rb') as f: key_bytes = f.read()
+    except OSError as err:
+        return f'key file {key} cannot be read: {err.strerror}'
+    try:
+        private_key = serialization.load_pem_private_key(key_bytes, password = None)
+    except TypeError:  # cryptography: "Password was not given but private key is encrypted"
+        return f'the private key {key} is passphrase protected and the passphrase was wrong/empty or could not be read (no terminal for the prompt)'
+    except Exception as err:
+        return f'key file {key} is not a valid/supported PEM private key: {err}'
+
+    pub_der = (serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    if x509cert.public_key().public_bytes(*pub_der) != private_key.public_key().public_bytes(*pub_der):
+        return f'the private key {key} does NOT match the certificate {cert}'
+
+    return f'no problem found in the files, OpenSSL error is: {type(e).__name__}: {e}'
+
+
 def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key: str = '', token_cert: str = '', token_key: str = '') -> ssl.SSLContext:
     """Create SSL context using either the default names for user certificate and token certificate or X509_USER_{CERT,KEY} JALIEN_TOKEN_{CERT,KEY} environment variables"""
     if use_usercert or not token_cert:
@@ -225,8 +260,8 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
         cert, key = token_cert, token_key
 
     if not cert or not key:
-        print_err('create_ssl_context:: no certificate to be used for SSL context. This message should not be printed')
-        return None
+        cred_type = 'user certificate' if use_usercert else 'user certificate or token'
+        raise SSLctxException(f'no valid {cred_type} found to be used for SSL context; check the previous messages in {DEBUG_FILE}')
 
     cafile = capath = None
     if os.path.isfile(CA_PATH):
@@ -247,9 +282,8 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
         try:
             ctx.load_verify_locations(cafile = cafile, capath = capath)
         except Exception as e:
-           print_err(f'Verify location could not be loaded!!! check content of >>> {CA_PATH} <<< and the log')
            logging.exception("SSL context:: Could not load verify location %s", CA_PATH, stack_info = True)
-           return None  # EIO /* I/O error */
+           raise SSLctxException(f'CA verify location could not be loaded, check content of >>> {CA_PATH} <<< : {type(e).__name__}: {e}') from e
     else:
         ctx.verify_mode = ssl.CERT_NONE  # CERT_NONE, CERT_OPTIONAL, CERT_REQUIRED
 
@@ -257,17 +291,16 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
     try:
         ctx.load_cert_chain(certfile = cert, keyfile = key)
     except Exception as e:
-        print_err(f'Error loading certificate pair!! Check the content of {DEBUG_FILE}')
-        logging.exception("SSL context:: Could not load cert/key pair:\nCert: %s\nKey: %s", cert, key, stack_info = True)  
-        return None  # EIO /* I/O error */
+        reason = cert_key_load_reason(e, cert, key)
+        logging.exception("SSL context:: Could not load cert/key pair:\nCert: %s\nKey: %s\nReason: %s", cert, key, reason, stack_info = True)
+        raise SSLctxException(f'could not load cert/key pair (cert: {cert} ; key: {key}): {reason}') from e
 
     logging.info('\n... SSL context done.')
     return ctx
 
 
-def make_connection_ctx(use_usercert: bool = False) -> Optional[ssl.SSLContext]:
-    """Create SSL context using AlienSessionInfo information"""
-    ctx = None
+def make_connection_ctx(use_usercert: bool = False) -> ssl.SSLContext:
+    """Create SSL context using AlienSessionInfo information; raise SSLctxException (with the reason as message) on failure"""
     # Check the content of AlienSessionInfo for values of cert and token files
     certs_info = None
     user_cert = user_key = token_cert = token_key = ''
@@ -282,20 +315,9 @@ def make_connection_ctx(use_usercert: bool = False) -> Optional[ssl.SSLContext]:
 
     # Check the presence of user certs and bailout before anything else
     if not token_cert and not user_cert:
-        print_err(f'No valid user certificate or token found!! check {DEBUG_FILE} for further information and contact the developer if the information is not clear.')
-        return None
+        raise SSLctxException(f'no valid user certificate or token found!! check {DEBUG_FILE} for further information and contact the developer if the information is not clear.')
 
-    ctx = create_ssl_context(use_usercert, user_cert = user_cert, user_key = user_key, token_cert = token_cert, token_key = token_key)
-    if not ctx:
-        if not user_cert: user_cert = 'INVALID'
-        if not user_key: user_key = 'INVALID'
-        if not token_cert: token_cert = 'INVALID'
-        if not token_key: token_key = 'INVALID'
-        msg = f'Could NOT create SSL context with cert files:\n{user_cert} ; {user_key}\n{token_cert} ; {token_key}'
-        print_err(f'{msg}\nCheck the logfile: {DEBUG_FILE}')
-        raise SSLctxException('connect_ssl::make_connection_ctx SSL ctx not present!!!')
-
-    return ctx
+    return create_ssl_context(use_usercert, user_cert = user_cert, user_key = user_key, token_cert = token_cert, token_key = token_key)
 
 
 def CertInfo(fname: str) -> RET:

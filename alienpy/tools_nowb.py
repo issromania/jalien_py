@@ -91,7 +91,8 @@ def time_str2unixmili(time_arg: Union[str, int, None]) -> int:
 
     # assume that this is a strptime arguments in the form of: time_str, format_str
     try:
-        time_obj = ast.literal_eval(f'datetime.datetime.strptime({time_arg})')
+        time_str, time_fmt = ast.literal_eval(f'({time_arg})')  # literal_eval cannot call functions: parse only the two string literals
+        time_obj = datetime.datetime.strptime(time_str, time_fmt)
         return int((time_obj - datetime.datetime(1970, 1, 1)).total_seconds() * 1000)
     except Exception:
         return int(-1)

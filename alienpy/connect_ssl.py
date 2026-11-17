@@ -191,7 +191,7 @@ def get_valid_tokens() -> tuple:
         temp_cert.close()
         TOKENCERT_NAME = temp_cert.name  # temp file was created, let's give the filename to tokencert
         ENV_TOKENCERT = True
-    if not path_readable(TOKENKEY_NAME) and TOKENKEY_NAME.startswith('-----BEGIN RSA PRIVATE KEY-----'):  # and is not a file
+    if not path_readable(TOKENKEY_NAME) and TOKENKEY_NAME.startswith(('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----', '-----BEGIN EC PRIVATE KEY-----')):  # PKCS#1, PKCS#8, SEC1; and is not a file
         temp_key = tempfile.NamedTemporaryFile(prefix = 'tokenkey_', suffix = cert_suffix, delete = False)
         temp_key.write(TOKENKEY_NAME.encode(encoding = "ascii", errors = "replace"))
         temp_key.close()

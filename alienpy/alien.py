@@ -1941,9 +1941,8 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
 
         # if shell command, just run it and return
         if cmdline.startswith('!'):
-            capture_out = '-noout' in cmdline
-            if not capture_out: cmdline.replace(' -noout', '')
-            ret_obj = runShellCMD(cmdline, captureout = capture_out, do_shell = True)
+            # -noout is accepted (as for run/exec) but never passed to the command; shell commands keep the terminal (no capture)
+            ret_obj = runShellCMD(cmdline.replace(' -noout', ''), captureout = False, do_shell = True)
             _exitcode = retf_print(ret_obj, 'debug')
             AlienSessionInfo['exitcode'] = _exitcode
             continue

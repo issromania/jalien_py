@@ -247,6 +247,10 @@ class SSLctxException(Exception):
     pass
 
 
+class WbRecvError(Exception):
+    """WebSocket failure after the message(s) were sent: the server may have executed the command(s)"""
+
+
 if __name__ == '__main__':
     print('This file should not be executed!', file = sys.stderr, flush = True)
     sys.exit(95)

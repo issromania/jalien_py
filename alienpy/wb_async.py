@@ -29,7 +29,7 @@ if not os.getenv('ALIENPY_NO_STAGGER'):
 
 
 from .setup_logging import DEBUG, DEBUG_FILE, print_err
-from .data_structs import SSLctxException
+from .data_structs import SSLctxException, WbRecvError
 from .global_vars import DEBUG_TIMING, TMPDIR, USER_AGENT, ALIENPY_ADDRESS_FAMILY
 from .tools_nowb import deltat_ms_perf
 from .connect_ssl import make_connection_ctx
@@ -234,8 +234,11 @@ async def wb_close(wb: ClientConnection, code, reason):
 async def wb_sendmsg(wb: ClientConnection, jsonmsg: str) -> str:
     """The low level async function for send/receive"""
     time_begin = time.perf_counter() if DEBUG_TIMING else None
-    await wb.send(jsonmsg)
-    result = await wb.recv()
+    await wb.send(jsonmsg)  # a failure here: the message was not sent, the caller can safely retry
+    try:
+        result = await wb.recv()
+    except Exception as e:
+        raise WbRecvError(f'no answer after the message was sent: {e!r}') from e
     if time_begin: logging.debug('>>>__sendmsg time = %s ms', deltat_ms_perf(time_begin))
     return result  # noqa: R504
 
@@ -248,11 +251,18 @@ async def wb_sendmsg_multi(wb: ClientConnection, jsonmsg_list: list) -> list:
     time_begin = time.perf_counter() if DEBUG_TIMING else None
     nr_messages = len(jsonmsg_list)
 
-    # send pipelined messages
-    for msg in jsonmsg_list: await wb.send(msg)
+    nr_sent = 0
+    try:
+        # send pipelined messages
+        for msg in jsonmsg_list:
+            await wb.send(msg)
+            nr_sent += 1
 
-    # receive and add to result_list the incoming messages
-    for _i in range(nr_messages): result_list.append(await wb.recv())
+        # receive and add to result_list the incoming messages
+        for _i in range(nr_messages): result_list.append(await wb.recv())
+    except Exception as e:
+        if nr_sent: raise WbRecvError(f'failure after {nr_sent}/{nr_messages} messages were sent: {e!r}') from e
+        raise  # nothing was sent, the caller can safely retry
 
     if time_begin: logging.debug('>>>__sendmsg time = %s ms', deltat_ms_perf(time_begin))
     return result_list

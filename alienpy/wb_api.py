@@ -20,7 +20,7 @@ except Exception:
 from websockets import ClientConnection as WebSocketClientProtocol
 from websockets.protocol import State as WbState
 
-from .data_structs import RET, SSLctxException
+from .data_structs import RET, SSLctxException, WbRecvError
 from .setup_logging import DEBUG, DEBUG_FILE, print_err, print_out
 from .global_vars import ALIENPY_GLOBAL_WB, AlienSessionInfo, DEBUG_TIMING, TIME_CONNECT, TMPDIR, get_certs_names, SET_SITE
 from .async_tools import syncify
@@ -264,6 +264,10 @@ def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = No
         nr_tries += 1
         try:
             result = wb_sendmsg(wb, jsonmsg)
+        except WbRecvError:  # the command reached the server: sending it again could execute it twice
+            logging.exception('SendMsg:: connection lost after sending: %s', jsonmsg)
+            wb = wb_reconnect(wb)
+            return RET(70, '', f'SendMsg:: connection lost while waiting for the answer; the command may have been executed by the server: {jsonmsg}')  # type: ignore [call-arg]  # ECOMM
         except Exception as e:
             logging.exception('SendMsg:: Error sending: %s\nBecause of %s', jsonmsg, e.__cause__)
             wb = wb_reconnect(wb)
@@ -315,6 +319,13 @@ def SendMsgMulti(wb: WebSocketClientProtocol, cmds_list: list, opts: str = '') -
         nr_tries += 1
         try:
             result_list = wb_sendmsg_multi(wb, json_cmd_list)
+        except WbRecvError:  # (some of) the commands reached the server: sending them again could execute them twice
+            logging.exception('SendMsgMulti:: connection lost after sending the commands, they are not sent again')
+            try:
+                wb = wb_reconnect(wb)
+            except Exception:
+                logging.exception('SendMsgMulti:: Could not recover connection when disconnected!!')
+            break
         except wb_exceptions.ConnectionClosed as e:
             logging.exception('SendMsgMulti:: failure because of %s', e.__cause__)
             try:

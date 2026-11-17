@@ -1399,7 +1399,7 @@ def DO_syscmd(wb: WebSocketClientProtocol, cmd: str = '', args: Union[None, list
     if isinstance(args, str): args = args.split()
     if not cmd: return RET(1, '', 'No system command specified!')
     new_arg_list = [download_tmp(wb, arg) if arg.startswith('alien:') else arg for arg in args]
-    new_arg_list.index(0, cmd)
+    new_arg_list.insert(0, cmd)
     return runShellCMD(' '.join(new_arg_list), captureout = True, do_shell = True)
 
 

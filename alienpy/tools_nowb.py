@@ -151,7 +151,7 @@ def is_guid(guid: str) -> bool:
 def run_function(function_name: str, *args, **kwargs):
     """Python code:: run some arbitrary function name (found in globals) with arbitrary arguments"""
     func = globals().get(function_name)
-    return func(*args, *kwargs) if func else None  # run arbitrary function
+    return func(*args, **kwargs) if func else None  # run arbitrary function
 
 
 def cursor_vertical(lines: int = 0) -> None:

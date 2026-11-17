@@ -126,13 +126,13 @@ def lfn2fileTokens_list(wb, input_lfn_list: list, specs: Union[None, list, str] 
 
 def path_grid_writable(file_stat: STAT_FILEPATH) -> bool:
     """Return writable status for a GRID path, for the current user"""
-    p_user = int(file_stat['perm'][0])
-    p_group = int(file_stat['perm'][1])
-    p_others = int(file_stat['perm'][2])
+    p_user = int(file_stat.perm[0])
+    p_group = int(file_stat.perm[1])
+    p_others = int(file_stat.perm[2])
     writable_user = writable_group = writable_others = False
     write_perm = {2, 6, 7}
-    if AlienSessionInfo['user'] == file_stat['uid'] and p_user in write_perm: writable_user = True
-    if AlienSessionInfo['user'] == file_stat['gid'] and p_group in write_perm: writable_group = True
+    if AlienSessionInfo['user'] == file_stat.uid and p_user in write_perm: writable_user = True
+    if AlienSessionInfo['user'] == file_stat.gid and p_group in write_perm: writable_group = True
     if p_others in write_perm: writable_others = True
     return writable_user or writable_group or writable_others
 

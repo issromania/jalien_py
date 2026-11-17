@@ -497,8 +497,9 @@ def name2regex(pattern_regex: str = '') -> str:
 
         if list_begin:
             translated_pattern_regex = re_all + '/' + f'{list_begin[0].val}{re_all_end}'  # first string after the last slash (last match exclude /)
+        else:
+            translated_pattern_regex = re_all  # once: contain, ends, ext alone must also match after any leading path
         for patt in list_contain:
-            if not list_begin: translated_pattern_regex = f'{re_all}'
             translated_pattern_regex = f'{translated_pattern_regex}{patt.val}{re_all_end}'
         if list_ends:
             translated_pattern_regex = f'{translated_pattern_regex}{list_ends[0].val}{re_all_end}'

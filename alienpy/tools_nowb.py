@@ -1245,14 +1245,11 @@ def getCAcerts(custom_dir: str = '') -> RET:
         return RET(1, '', 'Could not rsync content to destination!!!')
     shutil.rmtree(f'{CA_DIR_TEMP}', ignore_errors= True)
 
-    # check if openssl rehash (openssl >= 1.1) present
-    result = runShellCMD('openssl rehash 2>/dev/null', captureout = True, do_shell = True, timeout = 20)
-    # if the command gives error that means that is present and return error due to bad arguments
-    if result.exitcode == 1:
-        result = runShellCMD(f'openssl rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
-    else:
-        if is_cmd('c_rehash'):
-            result = runShellCMD(f'c_rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
+    # openssl rehash (openssl >= 1.1); fallback to c_rehash if it fails (older openssl: invalid command)
+    # N.B. never run "openssl rehash" without arguments: it rehashes the default system certificate directories
+    result = runShellCMD(f'openssl rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
+    if result.exitcode != 0 and is_cmd('c_rehash'):
+        result = runShellCMD(f'c_rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
 
     msg = f'Make sure to do "export X509_CERT_DIR={CA_DIR}" before the usage' if custom_dir else ''
     return RET(0, msg)

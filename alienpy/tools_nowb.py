@@ -477,9 +477,12 @@ def name2regex(pattern_regex: str = '') -> str:
     re_all_end = '[^/]*'
     verbs = ('begin', 'contain', 'ends', 'ext')
     pattern_list = pattern_regex.split('_')
-    if any(verb in pattern_regex for verb in verbs):
-        if pattern_list.count('begin') > 1 or pattern_list.count('end') > 1 or pattern_list.count('ext') > 1:
-            print_out('<begin>, <end>, <ext> verbs cannot appear more than once in the name selection')
+    if any(verb in pattern_list for verb in verbs):  # verbs are whole _ delimited tokens
+        if pattern_list.count('begin') > 1 or pattern_list.count('ends') > 1 or pattern_list.count('ext') > 1:
+            print_out('<begin>, <ends>, <ext> verbs cannot appear more than once in the name selection')
+            return ''
+        if pattern_list[-1] in verbs:
+            print_out(f'the last verb <{pattern_list[-1]}> does not have a value in the name selection')
             return ''
 
         list_begin = []

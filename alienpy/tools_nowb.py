@@ -1268,6 +1268,7 @@ def CreateJsonCommand(cmdline: Union[str, dict], args: Optional[list] = None, op
     if isinstance(cmdline, dict):
         if 'command' not in cmdline or 'options' not in cmdline: return ''
         out_dict = cmdline.copy()
+        out_dict["options"] = list(out_dict["options"])  # shallow copy shares the list: do not modify the caller's options
         if 'showmsg' in opts: opts = opts.replace('nomsg', '')
         if 'showkeys' in opts: opts = opts.replace('nokeys', '')
         if 'nomsg' in opts: out_dict["options"].insert(0, '-nomsg')
@@ -1279,6 +1280,7 @@ def CreateJsonCommand(cmdline: Union[str, dict], args: Optional[list] = None, op
         cmd = args.pop(0) if args else ''
     else:
         cmd = cmdline
+        args = list(args)  # do not modify the caller's list: the -nomsg/-nokeys inserts below would accumulate on reuse
     if 'nomsg' in opts: args.insert(0, '-nomsg')
     if 'nokeys' in opts: args.insert(0, '-nokeys')
     jsoncmd = {"command": cmd, "options": args}

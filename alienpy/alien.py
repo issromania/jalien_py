@@ -53,6 +53,7 @@ from .global_vars import ALIENPY_EXECUTABLE, ALIENPY_GLOBAL_WB, AlienSessionInfo
 from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION_STR
 ##   ASYNCIO MECHANICS
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
+from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
 from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, CA_PATH
 ##   General misc functions library
@@ -955,6 +956,7 @@ task name / detector name / [ / time [ / key = value]* ]
                                               requests_ssl_args if src.startswith(ccdb) else {})
                 if ret_http.exitcode != 0: errors.append(ret_http.err)
         elif download_list:
+            if _wb_api.ALIENPY_GLOBAL_WB is not None: ALIENPY_GLOBAL_WB = _wb_api.ALIENPY_GLOBAL_WB  # use the current session connection, if any
             if not ALIENPY_GLOBAL_WB: ALIENPY_GLOBAL_WB = InitConnection(cmdlist_func = constructCmdList)
             if DEBUG: logging.info('CCDB XRootD download:\n%s\n', '\n'.join(f'{src} -> {dst}' for src, dst, _ in download_list))
             src_list = [src for src, _, _ in download_list]
@@ -1975,6 +1977,8 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
         if cmd in AlienSessionInfo['cmd2func_map_nowb']:
             ret_obj = AlienSessionInfo['cmd2func_map_nowb'][cmd](args)
         else:
+            if _wb_api.ALIENPY_GLOBAL_WB is not None and _wb_api.ALIENPY_GLOBAL_WB is not wb:  # connection was replaced (reconnection, token-init)
+                wb = ALIENPY_GLOBAL_WB = _wb_api.ALIENPY_GLOBAL_WB
             if wb is None:
                 # If not prezent init connection and if command is token-init (without help being invoked) then use usercert
                 wb = InitConnection(wb, args if cmd == 'token-init' else [], use_usercert = (cmd == 'token-init' and not is_help(args)), cmdlist_func = constructCmdList)
@@ -2043,18 +2047,25 @@ class AliEn:
         self.internal_wb = InitConnection(cmdlist_func = constructCmdList)
         self.opts = opts
 
+    def _refresh_wb(self) -> None:
+        """Use the replacement connection if the session connection was re-created (reconnection, token-init)"""
+        if _wb_api.ALIENPY_GLOBAL_WB is not None: self.internal_wb = _wb_api.ALIENPY_GLOBAL_WB
+
     def run(self, cmd: str, opts: str = '') -> Union[RET, str]:
         """SendMsg to server a string command, a RET object will be returned"""
         if not opts: opts = self.opts
+        self._refresh_wb()
         return SendMsg(self.internal_wb, cmd, opts = opts)
 
     def ProcessMsg(self, cmd: str, opts: str = '') -> int:
         """ProcessCommandChain - the app main function to process a (chain of) command(s)"""
         if not opts: opts = self.opts
+        self._refresh_wb()
         return ProcessCommandChain(self.internal_wb, cmd)
 
     def wb(self) -> WebSocketClientProtocol:
         """Get the websocket, to be used in other functions"""
+        self._refresh_wb()
         return self.internal_wb
 
     @staticmethod

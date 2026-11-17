@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .global_vars import AlienSessionInfo
 from .wb_api import lfn_list  # nosec PYL-W0614
+from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 
 HAS_READLINE = False
 
@@ -46,7 +47,7 @@ def setupHistory(wb) -> None:
         elif len(tokens) == 1 and not prompt_line.endswith(' '):
             results = [f'{x} ' for x in AlienSessionInfo['commandlist'] if x.startswith(text)] + [None]
         else:
-            results = lfn_list(wb, text) + [None]
+            results = lfn_list(_wb_api.ALIENPY_GLOBAL_WB or wb, text) + [None]
         return results[state]
 
     rl.set_completer(complete)

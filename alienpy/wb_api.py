@@ -18,6 +18,7 @@ except Exception:
     sys.exit(1)
 # from websockets import WebSocketClientProtocol
 from websockets import ClientConnection as WebSocketClientProtocol
+from websockets.protocol import State as WbState
 
 from .data_structs import RET, SSLctxException
 from .setup_logging import DEBUG, DEBUG_FILE, print_err, print_out
@@ -150,6 +151,9 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
     """Create a session to AliEn services, including session globals and token regeneration"""
     global ALIENPY_GLOBAL_WB
 
+    # one connection per process: without a wb to replace, reuse the open session connection (already initialized)
+    if wb is None and not use_usercert and ALIENPY_GLOBAL_WB is not None and ALIENPY_GLOBAL_WB.state is WbState.OPEN: return ALIENPY_GLOBAL_WB
+
     wb = AlienConnect(wb, token_args, use_usercert, localConnect)  # Always valid, as the program will exit if connection could not be established
     ALIENPY_GLOBAL_WB = wb
     ## wb is guaranteed to be present as AlienConnect will bail out if not
@@ -194,6 +198,10 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
 def wb_reconnect(wb: WebSocketClientProtocol) -> WebSocketClientProtocol:
     """Replace a failed connection: restore ALIEN_SITE and the server-side cwd, record the new socket as ALIENPY_GLOBAL_WB"""
     global ALIENPY_GLOBAL_WB
+    # one connection per process: a failed connection that is not the session one is replaced by the open session connection
+    if ALIENPY_GLOBAL_WB is not None and wb is not ALIENPY_GLOBAL_WB and ALIENPY_GLOBAL_WB.state is WbState.OPEN:
+        _ = wb_close(wb, code = 1000, reason = 'Replaced by the session connection')
+        return ALIENPY_GLOBAL_WB
     wb = AlienConnect(wb)  # it will exit the program if no connection is possible
     ALIENPY_GLOBAL_WB = wb
     # use wb_sendmsg directly (not SendMsg) to avoid a recursive reconnection
@@ -211,8 +219,15 @@ def wb_reconnect(wb: WebSocketClientProtocol) -> WebSocketClientProtocol:
     return wb
 
 
+def wb_live(wb: Optional[WebSocketClientProtocol]) -> Optional[WebSocketClientProtocol]:
+    """If wb is a closed connection that was replaced (reconnection, token-init) return the current one (ALIENPY_GLOBAL_WB)"""
+    if wb is not None and ALIENPY_GLOBAL_WB is not None and wb is not ALIENPY_GLOBAL_WB and wb.state is not WbState.OPEN: return ALIENPY_GLOBAL_WB
+    return wb
+
+
 def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = None, opts: str = '') -> RET:
     """Send a json message to the specified websocket; it will return the server answer"""
+    wb = wb_live(wb)  # a caller may still hold a connection that was replaced
     if not wb:
         msg = "SendMsg:: websocket not initialized"
         logging.info(msg)
@@ -269,6 +284,7 @@ def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = No
 
 def SendMsgMulti(wb: WebSocketClientProtocol, cmds_list: list, opts: str = '') -> list:
     """Send a json message to the specified websocket; it will return the server answer"""
+    wb = wb_live(wb)  # a caller may still hold a connection that was replaced
     if not wb:
         msg = "SendMsg:: websocket not initialized"
         logging.info(msg)
@@ -450,6 +466,7 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
 
 def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> WebSocketClientProtocol:
     """Do the disconnect, connect with user cert, generate token, re-connect with token procedure"""
+    wb = wb_live(wb)  # close/replace the current session connection, not a stale one held by the caller
     wb_usercert = None
     if not args: args = []
 
@@ -468,7 +485,7 @@ def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> Web
     if 'AlienSessionInfo' in globals(): AlienSessionInfo['use_usercert'] = False
     wb_token_new = None
     try:
-        wb_token_new = InitConnection(wb_token_new, args)
+        wb_token_new = InitConnection(wb_usercert, args)  # pass the closed usercert wb: a new connection (with the new token) is required, never a reuse
         __ = SendMsg(wb_token_new, 'pwd', [], opts = 'nokeys')  # just to refresh cwd
     except Exception:
         logging.exception('token_regen:: error re-initializing connection')
@@ -519,6 +536,7 @@ def lfn_list(wb: WebSocketClientProtocol, lfn: str = '') -> list:
 
 def wb_ping(wb: WebSocketClientProtocol) -> float:
     """Websocket ping function, it will return rtt in ms"""
+    wb = wb_live(wb)  # a caller may still hold a connection that was replaced
     init_begin = time.perf_counter()
     if IsWbConnected(wb):
         return float(deltat_ms_perf(init_begin))

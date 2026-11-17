@@ -253,7 +253,8 @@ def cert_key_load_reason(e: Exception, cert: str, key: str) -> str:
 
 def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key: str = '', token_cert: str = '', token_key: str = '') -> ssl.SSLContext:
     """Create SSL context using either the default names for user certificate and token certificate or X509_USER_{CERT,KEY} JALIEN_TOKEN_{CERT,KEY} environment variables"""
-    if use_usercert or not token_cert:
+    use_token = not (use_usercert or not token_cert)
+    if not use_token:
         if AlienSessionInfo: AlienSessionInfo['use_usercert'] = True
         cert, key = user_cert, user_key
     else:
@@ -276,7 +277,7 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
     ctx.check_hostname = False
 
     # do not do CA verificattion for token, only for usercert
-    if not 'token' in cert:
+    if not use_token:
         ctx.verify_mode = ssl.CERT_REQUIRED  # CERT_NONE, CERT_OPTIONAL, CERT_REQUIRED
         logging.info('SSL context:: Loading verify location:\n%s', CA_PATH)
         try:

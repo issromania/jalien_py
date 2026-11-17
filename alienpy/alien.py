@@ -1354,7 +1354,7 @@ def DO_run(wb: WebSocketClientProtocol, args: Optional[list] = None, external: b
         return RET(exitcode=1, out='', err = 'XRootD module not present, this command will not work!!')
 
     overwrite = get_arg(args, '-force')
-    capture_out = get_arg(args, '-noout')
+    capture_out = not get_arg(args, '-noout')  # -noout : do not capture the output
 
     # args will be a mix of command arguments and lfns; let's select lfns
     list_of_lfns = [arg for arg in args if 'alien:' in arg]
@@ -1382,7 +1382,7 @@ def DO_exec(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
         return RET(0, msg)
 
     overwrite = get_arg(args, '-force')
-    capture_out = get_arg(args, '-noout')
+    capture_out = not get_arg(args, '-noout')  # -noout : do not capture the output
 
     lfn = args.pop(0)  # the script to be executed
     opt_args = " ".join(args)

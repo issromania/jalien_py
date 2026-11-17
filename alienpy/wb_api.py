@@ -46,9 +46,11 @@ def wb_create_tryout(host: str, port: Union[str, int], path: str = '/', use_user
 
         try:
             wb = wb_create(host, port, path, use_usercert, localConnect)
-        except SSLctxException:
-            logging.exception(f'>>>wb_api::wb_create_tryout:: try_nr {nr_tries} :: SSL context exception')
-            return None
+        except SSLctxException as e:
+            msg = f'SSL context could not be created, connection to {host}:{port} is not possible!!\nReason: {e}\nCheck the logfile: {DEBUG_FILE}'
+            logging.error(msg)
+            print_err(msg)
+            sys.exit(5)  # EIO /* I/O error */
         except Exception as e:
             logging.exception(f'n>>>wb_api::wb_create_tryout:: exception when wb_create; try_nr {nr_tries}\n{e}\n', stack_info = True)
 

@@ -424,14 +424,14 @@ def list_files_grid(wb, search_dir: str, pattern: Union[re.Pattern[str], str, No
 
     user = get_arg_value(find_args_list, '-user')
     if user:
-        if not user.isalpha() or user.startswith("-"):
+        if user.startswith("-"):
             print_err(f'list_files_grid::user arg not recognized: {" ".join(find_args_list)}')
         else:
             filter_args_list.extend(['-user', user])
 
     group = get_arg_value(find_args_list, '-group')
     if group:
-        if not group.isalpha() or group.startswith("-"):
+        if group.startswith("-"):
             print_err(f'list_files_grid::group arg not recognized: {" ".join(find_args_list)}')
         else:
             filter_args_list.extend(['-group', group])

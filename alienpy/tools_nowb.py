@@ -968,18 +968,18 @@ def filter_file_prop(f_obj: dict, base_dir: str, find_opts: Union[str, list, Non
         if "jobid" not in f_obj:
             print_err('filter_file_prop::jobid - could not find jobid information in file dictionary, selection failed!')
             return False
-        if f_obj["jobid"] != jobid: return False
+        if str(f_obj["jobid"]) != jobid: return False  # the json value can be a number
 
     user = get_arg_value(opts, '-user')
     if user:
-        if not user.isalpha() or user.startswith("-"):
+        if user.startswith("-"):
             print_err(f'filter_file_prop::Missing argument in list:: {" ".join(opts)}')
             return False
         if f_obj["owner"] != user: return False
 
     group = get_arg_value(opts, '-group')
     if group:
-        if not group.isalpha() or group.startswith("-"):
+        if group.startswith("-"):
             print_err(f'filter_file_prop::Missing argument in list:: {" ".join(opts)}')
             return False
         if f_obj["gowner"] != group: return False

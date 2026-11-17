@@ -1954,7 +1954,12 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
             continue
 
         # initial state of args
-        args_ini = shlex.split(input_alien.strip(), posix = True)
+        try:
+            args_ini = shlex.split(input_alien.strip(), posix = True)
+        except ValueError as e:  # e.g. unbalanced quotes; must not terminate the interactive shell
+            _exitcode = retf_print(RET(22, '', f'Invalid command line ({e}): {input_alien}'))  # EINVAL
+            AlienSessionInfo['exitcode'] = _exitcode
+            continue
         cmd = args_ini.pop(0)
 
         # reprocess arguments in case the main argument list is passed as quoted string

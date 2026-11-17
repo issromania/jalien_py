@@ -21,10 +21,10 @@ def deque_pop_pos(dq: deque, pos: int = 1) -> str:
     val = ''
     if pos > 0:
         val = dq.pop()
-        if len(dq) > 1: dq.rotate(- (pos - 1))
+        dq.rotate(- pos)  # undo the initial rotation
     else:
         val = dq.popleft()
-        if len(dq) > 1: dq.rotate(abs(pos) - 1)
+        dq.rotate(abs(pos))  # undo the initial rotation
     return val  # noqa: R504
 
 

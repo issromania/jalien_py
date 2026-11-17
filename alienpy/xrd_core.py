@@ -725,7 +725,7 @@ if HAS_XROOTD:
             self.wb = None
             self.copy_failed_list = []  # record the failed jobs
             self.jobs = int(0)
-            self.job_list = []
+            self.job_list = {}  # jobId -> job info; XRootD jobs may begin/end in any order when running in parallel
             self.xrdjob_list = []
             self.successful_writes = []
             self.successful_write_jobs = []  # xrdjob of each successful_writes entry (same index)
@@ -742,7 +742,7 @@ if HAS_XROOTD:
             file_size = xrdjob.token_request['size'] if xrdjob.isUpload else get_size_meta(xrdjob.src)
 
             jobInfo = {'src': source, 'tgt': target, 'bytes_total': file_size, 'bytes_processed': 0, 'start': timestamp_begin}
-            self.job_list.insert(jobId - 1, jobInfo)
+            self.job_list[jobId] = jobInfo
             if self.debug: logging.debug('CopyProgressHandler.src: %s\nCopyProgressHandler.dst: %s\n', source, target)
 
         def end(self, jobId, results) -> None:
@@ -755,7 +755,7 @@ if HAS_XROOTD:
             else:
                 status = f'{PrintColor(COLORS.BIRed)}UNKNOWN{PrintColor(COLORS.ColorReset)}'
 
-            job_info = self.job_list[jobId - 1]
+            job_info = self.job_list[jobId]
             xrdjob = self.xrdjob_list[jobId - 1]  # joblist initialized when starting; we use the internal index to locate the job
             job_status_info = f"jobID: {jobId}/{self.jobs} >>> STATUS {status}"
 

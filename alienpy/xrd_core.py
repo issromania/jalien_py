@@ -28,6 +28,8 @@ from .tools_nowb import (GetHumanReadableSize, PrintColor, common_path, create_m
 from .xrd_tools import commitFileList, expand_path_grid, extract_glob_pattern, lfn2fileTokens, list_files_grid, path_grid_stat, path_type, pathtype_grid, xrdcp_help, lfnIsValid
 
 HAS_XROOTD = False
+# cp tunables as set by the user environment at start: DO_XrootdCp writes these keys in os.environ, which must not leak into the next cp
+_XRDCP_ENV_INIT = {k: os.getenv(k) for k in ('XRD_SUBSTREAMSPERCHANNEL', 'XRD_CPPARALLELCHUNKS', 'XRD_CPCHUNKSIZE', 'XRD_CPTIMEOUT', 'XRD_XRATETHRESHOLD', 'XRD_CPRETRY')}
 #XRDCP_CMD = None
 
 
@@ -349,21 +351,21 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     # :param checksumpreset: pre-set checksum instead of computing it #:type  checksumpreset: string
     hashtype  = 'md5'
     batch     = int(8)   # from a list of copy jobs, start <batch> number of downloads
-    streams   = int(os.getenv('XRD_SUBSTREAMSPERCHANNEL', '1'))  # uses num additional parallel streams to do the transfer
-    chunks    = int(os.getenv('XRD_CPPARALLELCHUNKS', '4'))      # number of chunks that should be requested in parallel
-    chunksize = int(os.getenv('XRD_CPCHUNKSIZE', '4194304'))     # chunk size for remote transfers
+    streams   = int(_XRDCP_ENV_INIT['XRD_SUBSTREAMSPERCHANNEL'] or '1')  # uses num additional parallel streams to do the transfer
+    chunks    = int(_XRDCP_ENV_INIT['XRD_CPPARALLELCHUNKS'] or '4')      # number of chunks that should be requested in parallel
+    chunksize = int(_XRDCP_ENV_INIT['XRD_CPCHUNKSIZE'] or '4194304')     # chunk size for remote transfers
     overwrite = False  # overwrite target if it exists
     cksum     = False
-    timeout   = int(os.getenv('XRD_CPTIMEOUT', '0'))
-    rate      = int(os.getenv('XRD_XRATETHRESHOLD', '0'))
-    retry     = int(os.getenv('XRD_CPRETRY', '2'))
+    timeout   = int(_XRDCP_ENV_INIT['XRD_CPTIMEOUT'] or '0')
+    rate      = int(_XRDCP_ENV_INIT['XRD_XRATETHRESHOLD'] or '0')
+    retry     = int(_XRDCP_ENV_INIT['XRD_CPRETRY'] or '2')
 
     if get_arg(xrd_copy_command, '-noxrdzip'): os.environ["ALIENPY_NOXRDZIP"] = "nozip"
 
     streams_arg = get_arg_value(xrd_copy_command, '-S')
     if streams_arg and is_int(streams_arg):
         streams = min(abs(int(streams_arg)), 15)
-        if os.getenv('XRD_SUBSTREAMSPERCHANNEL'):
+        if _XRDCP_ENV_INIT['XRD_SUBSTREAMSPERCHANNEL']:
             print_out(f'Warning! env var XRD_SUBSTREAMSPERCHANNEL is set and will be overwritten with value: {streams}')
     XRD_EnvPut('SubStreamsPerChannel', streams)  # if no env customization, then use our defaults
     os.environ['XRD_SUBSTREAMSPERCHANNEL'] = str(streams)
@@ -371,7 +373,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     chunks_arg = get_arg_value(xrd_copy_command, '-chunks')
     if chunks_arg and is_int(chunks_arg):
         chunks = abs(int(chunks_arg))
-        if os.getenv('XRD_CPPARALLELCHUNKS'):
+        if _XRDCP_ENV_INIT['XRD_CPPARALLELCHUNKS']:
             print_out(f'Warning! env var XRD_CPPARALLELCHUNKS is set and will be overwritten with value: {chunks}')
     XRD_EnvPut('CPParallelChunks', chunks)
     os.environ['XRD_CPPARALLELCHUNKS'] = str(chunks)
@@ -379,7 +381,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     chunksz_arg = get_arg_value(xrd_copy_command, '-chunksz')
     if chunksz_arg and is_int(chunksz_arg):
         chunksize = abs(int(chunksz_arg))
-        if os.getenv('XRD_CPCHUNKSIZE'):
+        if _XRDCP_ENV_INIT['XRD_CPCHUNKSIZE']:
             print_out(f'Warning! env var XRD_CPCHUNKSIZE is set and will be overwritten with value {chunksize}')
     XRD_EnvPut('CPChunkSize', chunksize)
     os.environ['XRD_CPCHUNKSIZE'] = str(chunksize)
@@ -387,7 +389,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     timeout_arg = get_arg_value(xrd_copy_command, '-timeout')
     if timeout_arg and is_int(timeout_arg):
         timeout = abs(int(timeout_arg))
-        if os.getenv('XRD_CPTIMEOUT'):
+        if _XRDCP_ENV_INIT['XRD_CPTIMEOUT']:
             print_out(f'Warning! env var XRD_CPTIMEOUT is set and will be overwritten with value {timeout}')
     XRD_EnvPut('cpTimeout', timeout)
     os.environ['XRD_CPTIMEOUT'] = str(timeout)
@@ -395,7 +397,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     rate_arg = get_arg_value(xrd_copy_command, '-ratethreshold')
     if rate_arg and is_int(rate_arg):
         rate = abs(int(rate_arg))
-        if os.getenv('XRD_XRATETHRESHOLD'):
+        if _XRDCP_ENV_INIT['XRD_XRATETHRESHOLD']:
             print_out(f'Warning! env var XRD_XRATETHRESHOLD is set and will be overwritten with value {rate}')
     XRD_EnvPut('XRateThreshold', rate)
     os.environ['XRD_XRATETHRESHOLD'] = str(rate)
@@ -403,7 +405,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     retry_arg = get_arg_value(xrd_copy_command, '-retry')
     if retry_arg and is_int(retry_arg):
         retry = abs(int(retry_arg))
-        if os.getenv('XRD_CPRETRY'):
+        if _XRDCP_ENV_INIT['XRD_CPRETRY']:
             print_out(f'Warning! env var XRD_CPRETRY is set and will be overwritten with value {retry}')
     XRD_EnvPut('CpRetry', retry)
     os.environ['XRD_CPRETRY'] = str(retry)

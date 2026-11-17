@@ -350,7 +350,8 @@ def session_state_update(out_dict: dict) -> None:
             AlienSessionInfo['prevdir'] = prev_dir
 
         # update directory stack (pushd/popd/dirs)
-        short_current_dir = current_dir.replace(AlienSessionInfo['alienHome'][:-1], '~')
+        alien_home = f"{AlienSessionInfo['alienHome'].rstrip('/')}/"  # current_dir (server metadata) always ends with /
+        short_current_dir = f'~/{current_dir[len(alien_home):]}' if current_dir.startswith(alien_home) else current_dir  # only a leading home path
         short_current_dir = short_current_dir[:-1]  # remove the last /
         if AlienSessionInfo['pathq']:
             if AlienSessionInfo['pathq'][0] != short_current_dir: AlienSessionInfo['pathq'][0] = short_current_dir

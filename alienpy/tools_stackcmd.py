@@ -10,7 +10,7 @@ def push2stack(path: str) -> None:
     if not path or 'AlienSessionInfo' not in globals(): return
     home = ''
     if AlienSessionInfo['alienHome']: home = AlienSessionInfo['alienHome'][:-1]
-    if home and home in path: path = path.replace(home, '~')
+    if home and (path == home or path.startswith(f'{home}/')): path = f'~{path[len(home):]}'  # only a leading home path component
     AlienSessionInfo['pathq'].appendleft(path)
 
 

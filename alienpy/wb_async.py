@@ -157,11 +157,11 @@ async def wb_create(host: str = 'localhost', port: Union[str, int] = '8097', pat
 
     try:
         ctx = make_connection_ctx(use_usercert)
+    except SSLctxException:
+        raise  # the reason is in the exception message, it will be logged and the program will exit in wb_api::wb_create_tryout
     except Exception as e:
-        msg = f'wb_async::wb_create:: Exception creating SSL context\nCheck the logfile: {DEBUG_FILE}'
-        print_err(msg)
-        logging.exception("%s >>> wb_async::wb_create:: Exception creating SSL context", msg, stack_info = True)
-        raise SSLctxException('wb_async::wb_create SSL ctx not present!!!')
+        logging.exception('wb_async::wb_create:: Unexpected exception creating SSL context', stack_info = True)
+        raise SSLctxException(f'unexpected exception creating SSL context: {type(e).__name__}: {e}') from e
 
     socket_endpoint = await create_socket(host, port, path)
     if not socket_endpoint:

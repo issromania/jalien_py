@@ -423,8 +423,8 @@ def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
 
     ctx = OpenSSL.SSL.Context(OpenSSL.SSL.TLS_METHOD)  # skipcq: PTC-W6001
     ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.use_privatekey(x509key)
-    ctx.use_certificate(x509cert)
+    ctx.use_privatekey(x509key.to_cryptography_key())  # passing pyOpenSSL PKey/X509 objects is deprecated (pyOpenSSL >= 25)
+    ctx.use_certificate(x509cert.to_cryptography())
 
     cafile = capath = None
     if os.path.isfile(CA_PATH):

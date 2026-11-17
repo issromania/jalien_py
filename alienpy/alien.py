@@ -1603,7 +1603,7 @@ def DO_help(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
                '-json : will enable global printing of stdout as json (as opposed to <cmd -json>)\n'
                '-debug : enable debug mode\n'
                'term | terminal | console : python terminal with ready to use alienpy methods\n'
-               '<a file> : if 1st arg is a file, it will be processed as a batch of commands\n'
+               '<a file> : if the only argument is a file path (containing / or .), it will be processed as a batch of commands\n'
                'alien_<CMD> symlink to alien.py : will execute CMD in command mode with the rest of arguments\n\n'
                'Project documentation can be found at:\n'
                'https://jalien.docs.cern.ch/\n'
@@ -2144,7 +2144,9 @@ def main() -> None:
     if verb: sys.argv.insert(0, verb)
 
     arg_list = None
-    if len(sys.argv) > 0 and os.path.isfile(sys.argv[0]):
+    # batch mode: the only argument is an existing file given as a path (containing / or .)
+    # a bare word (e.g. ls) is always a command, even if a local file with that name exists; use ./name for such a batch file
+    if len(sys.argv) == 1 and ('/' in sys.argv[0] or '.' in sys.argv[0]) and os.path.isfile(sys.argv[0]):
         with open(sys.argv[0], encoding="ascii", errors="replace") as input_file:
             arg_list = input_file.read().strip().replace('\n',';')
     else:

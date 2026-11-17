@@ -3,8 +3,7 @@
 import dataclasses
 import os
 import re
-import subprocess
-import shlex
+import shutil
 import sys
 from typing import Union
 import logging
@@ -82,7 +81,11 @@ def lfn2meta(wb, lfn: str, local_file: str = '', specs: Union[None, list, str] =
     if not metafile:
         print_err(f"Could not create the download metafile for {lfn}")
         return ''
-    subprocess.run(shlex.split(f'mv {metafile} {os.getcwd()}/'), check = False)  # keep it in local directory  # nosec
+    try:
+        shutil.move(metafile, os.path.join(os.getcwd(), os.path.basename(metafile)))  # keep it in local directory
+    except Exception as e:
+        print_err(f'Could not move the metafile {metafile} to the current directory: {e!r}')
+        return ''
     metafile = os.path.realpath(os.path.basename(metafile))
     return f'{metafile}?xrdcl.unzip={file_in_zip}' if (file_in_zip and 'ALIENPY_NOXRDZIP' not in os.environ) else f'{metafile}'
 

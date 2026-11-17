@@ -9,9 +9,7 @@ from urllib.parse import urlparse
 import logging
 import re
 from pathlib import Path
-import shlex
-# import shutil
-import subprocess
+import shutil
 import uuid
 import time
 import xml.dom.minidom as MD  # noqa: N812
@@ -768,7 +766,10 @@ if HAS_XROOTD:
 
             if not xrdjob.isUpload and os.getenv('ALIENPY_KEEP_META'):
                 meta_path, _, _ = str(xrdjob.src).partition("?")
-                subprocess.run(shlex.split(f'cp -f {meta_path} {os.getcwd()}/'), check = False)  # nosec
+                try:
+                    shutil.copy2(meta_path, os.getcwd())
+                except Exception:
+                    logging.exception('Could not copy the metafile %s to the current directory', meta_path)
 
             if results['status'].ok:
                 speed = float(job_info['bytes_total']) / deltaT

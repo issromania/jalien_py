@@ -1172,14 +1172,17 @@ def queryML(args: list = None) -> RET:
     url = f'{alimon}{predicate}{type_default}'
     exitcode = stdout = stderr = ansdict = ansraw = None
 
-    url_req = urlreq.Request(url)
-    with urlreq.urlopen(url_req) as req:  # nosec
-        ansraw = req.read().decode()
-        exitcode = 0 if (req.getcode() == 200) else req.getcode()
+    try:
+        url_req = urlreq.Request(url)
+        with urlreq.urlopen(url_req) as req:  # nosec
+            ansraw = req.read().decode()
+            exitcode = 0 if (req.getcode() == 200) else req.getcode()
+        if type_default == type_json: ansdict = json.loads(ansraw)
+    except Exception as e:  # HTTPError (any non-2xx), URLError, timeout, invalid json
+        return RET(1, '', f'queryML:: query {url} failed: {e!r}')
 
     if type_default == type_json:
         stdout = stderr = ''
-        ansdict = json.loads(ansraw)
     else:
         stdout, stderr = (ansraw, '') if exitcode == 0 else ('', ansraw)
     return RET(exitcode, stdout, stderr, ansdict)

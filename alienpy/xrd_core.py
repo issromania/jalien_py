@@ -801,7 +801,7 @@ if HAS_XROOTD:
                         with zipfile.ZipFile(zip_name) as myzip:
                             if src_file_name in myzip.namelist():
                                 out_path = myzip.extract(src_file_name, path = dst_file_path)
-                                if out_path and (src_file_name != dst_file_name): os.replace(src_file_name, dst_file_name)
+                                if out_path and (src_file_name != dst_file_name): os.replace(out_path, xrdjob.dst)
                             else:  # the downloaded file is actually a zip file
                                 os.replace(zip_name, xrdjob.dst)
                         if os.path.isfile(zip_name): os.remove(zip_name)

@@ -285,8 +285,10 @@ def makelist_lfn(wb, arg_source: str, arg_target: str, find_args: Optional[list]
     return RET(1, '', error_msg) if error_msg else RET(0)
 
 
-def makelist_xrdjobs(copylist_lfns: list, copylist_xrd: list) -> None:
-    """Process a list of lfns to add to XRootD copy jobs list"""
+def makelist_xrdjobs(copylist_lfns: list, copylist_xrd: list, no_xrdzip: Optional[bool] = None) -> None:
+    """Process a list of lfns to add to XRootD copy jobs list
+    no_xrdzip : download the whole archive instead of the zip member; None: use the ALIENPY_NOXRDZIP env var"""
+    if no_xrdzip is None: no_xrdzip = 'ALIENPY_NOXRDZIP' in os.environ
     for cpfile in copylist_lfns:
         if 'results' not in cpfile.token_request:
             print_err(f"No token info for {cpfile}\nThis message should not happen! Please contact the developer if you see this!")
@@ -316,7 +318,7 @@ def makelist_xrdjobs(copylist_lfns: list, copylist_xrd: list) -> None:
                 print_err(f"Could not create the download metafile for {cpfile.src}")
                 continue
             AlienSessionInfo['templist'].append(metafile)
-            if file_in_zip and 'ALIENPY_NOXRDZIP' not in os.environ: metafile = f'{metafile}?xrdcl.unzip={file_in_zip}'
+            if file_in_zip and not no_xrdzip: metafile = f'{metafile}?xrdcl.unzip={file_in_zip}'
             if DEBUG: print_out(f'makelist_xrdjobs:: {metafile}')
             copylist_xrd.append(CopyFile(metafile, cpfile.dst, cpfile.isUpload, cpfile.token_request['results'], cpfile.src))  # we do not need the tokens in job list when downloading
 
@@ -360,7 +362,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     rate      = int(_XRDCP_ENV_INIT['XRD_XRATETHRESHOLD'] or '0')
     retry     = int(_XRDCP_ENV_INIT['XRD_CPRETRY'] or '2')
 
-    if get_arg(xrd_copy_command, '-noxrdzip'): os.environ["ALIENPY_NOXRDZIP"] = "nozip"
+    no_xrdzip = get_arg(xrd_copy_command, '-noxrdzip') or 'ALIENPY_NOXRDZIP' in os.environ  # per command; the env var is only read, never set or removed
 
     streams_arg = get_arg_value(xrd_copy_command, '-S')
     if streams_arg and is_int(streams_arg):
@@ -606,7 +608,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
 
     # create a list of copy jobs to be passed to XRootD mechanism
     xrdcopy_job_list = []
-    makelist_xrdjobs(copy_lfnlist, xrdcopy_job_list)
+    makelist_xrdjobs(copy_lfnlist, xrdcopy_job_list, no_xrdzip = no_xrdzip)
 
     if not xrdcopy_job_list:
         msg = "No XRootD operations in list! enable the DEBUG mode for more info"
@@ -631,7 +633,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
 
     my_cp_args = XrdCpArgs(overwrite, batch, tpc, hashtype, cksum, timeout, rate)
     # defer the list of url and files to xrootd processing - actual XRootD copy takes place
-    copy_failed_list = XrdCopy(wb, xrdcopy_job_list, my_cp_args, printout)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list, my_cp_args)
+    copy_failed_list = XrdCopy(wb, xrdcopy_job_list, my_cp_args, printout, no_xrdzip = no_xrdzip)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list, my_cp_args)
     copy_jobs_nr = len(xrdcopy_job_list)
     copy_jobs_failed_nr = len(copy_failed_list)
     copy_jobs_success_nr = copy_jobs_nr - copy_jobs_failed_nr
@@ -666,8 +668,8 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
 
             if to_recover_list_try1:
                 xrdcopy_job_list_2 = []
-                makelist_xrdjobs(to_recover_list_try1, xrdcopy_job_list_2)
-                copy_failed_list2 = XrdCopy(wb, xrdcopy_job_list_2, my_cp_args, printout)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list_2, my_cp_args)
+                makelist_xrdjobs(to_recover_list_try1, xrdcopy_job_list_2, no_xrdzip = no_xrdzip)
+                copy_failed_list2 = XrdCopy(wb, xrdcopy_job_list_2, my_cp_args, printout, no_xrdzip = no_xrdzip)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list_2, my_cp_args)
                 copy_jobs_nr1 = len(xrdcopy_job_list_2)
                 copy_jobs_failed_nr1 = len(copy_failed_list2)
                 copy_jobs_success_nr1 = copy_jobs_nr1 - copy_jobs_failed_nr1
@@ -696,8 +698,8 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
 
             if to_recover_list_try2:
                 xrdcopy_job_list_3 = []
-                makelist_xrdjobs(to_recover_list_try2, xrdcopy_job_list_3)
-                copy_failed_list3 = XrdCopy(wb, xrdcopy_job_list_3, my_cp_args, printout)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list_3, my_cp_args)
+                makelist_xrdjobs(to_recover_list_try2, xrdcopy_job_list_3, no_xrdzip = no_xrdzip)
+                copy_failed_list3 = XrdCopy(wb, xrdcopy_job_list_3, my_cp_args, printout, no_xrdzip = no_xrdzip)  # if not _use_system_xrdcp else XrdCopy_xrdcp(xrdcopy_job_list_3, my_cp_args)
                 copy_jobs_nr2 = len(xrdcopy_job_list_3)
                 copy_jobs_failed_nr2 = len(copy_failed_list3)
                 copy_jobs_success_nr2 = copy_jobs_nr2 - copy_jobs_failed_nr2
@@ -713,14 +715,13 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
         msg_sum = f"Successful jobs (total): {copy_jobs_success_nr_total}/{copy_jobs_nr_total}" if not ('quiet' in printout or 'silent' in printout) else ''
         msg_list.append(msg_sum)
     msg_all = '\n'.join(x.strip() for x in msg_list if x.strip())
-    if 'ALIENPY_NOXRDZIP' in os.environ: os.environ.pop("ALIENPY_NOXRDZIP")
     return RET(0, msg_all) if copy_jobs_success_nr_total > 0 else RET(1, '', msg_all)
 
 
 if HAS_XROOTD:
     class MyCopyProgressHandler(xrd_client.utils.CopyProgressHandler):
         """Custom ProgressHandler for XRootD copy process"""
-        __slots__ = ('wb', 'copy_failed_list', 'jobs', 'job_list', 'xrdjob_list', 'successful_writes', 'successful_write_jobs', 'printout', 'debug')
+        __slots__ = ('wb', 'copy_failed_list', 'jobs', 'job_list', 'xrdjob_list', 'successful_writes', 'successful_write_jobs', 'printout', 'debug', 'no_xrdzip')
 
         def __init__(self) -> None:
             self.wb = None
@@ -731,6 +732,7 @@ if HAS_XROOTD:
             self.successful_writes = []
             self.successful_write_jobs = []  # xrdjob of each successful_writes entry (same index)
             self.printout = ''
+            self.no_xrdzip = False  # download the whole archive and extract the member locally
             self.debug = False
 
         def begin(self, jobId, total, source, target) -> None:
@@ -796,7 +798,7 @@ if HAS_XROOTD:
                     attr_list = [('guid', guid), ('lfn', lfn), ('size', size), ('md5', md5), ('ts_r', ts), ('ts_w', ts)]
 
                     # NOXRDZIP was requested
-                    if 'ALIENPY_NOXRDZIP' in os.environ and os.path.isfile(xrdjob.dst) and zipfile.is_zipfile(xrdjob.dst):
+                    if self.no_xrdzip and os.path.isfile(xrdjob.dst) and zipfile.is_zipfile(xrdjob.dst):
                         src_file_name = os.path.basename(xrdjob.lfn)
                         dst_file_name = os.path.basename(xrdjob.dst)
                         dst_file_path = os.path.dirname(xrdjob.dst)
@@ -830,7 +832,7 @@ if HAS_XROOTD:
                     print_err(f'Copy job duration >= RequestTimeout default setting ({defined_reqtimeout}); Contact developer for support.')
 
 
-def XrdCopy(wb, job_list: list, xrd_cp_args: XrdCpArgs, printout: str = '') -> list:
+def XrdCopy(wb, job_list: list, xrd_cp_args: XrdCpArgs, printout: str = '', no_xrdzip: Optional[bool] = None) -> list:
     """XRootD copy command :: the actual XRootD copy process"""
     if not HAS_XROOTD:
         print_err("XrdCopy:: XRootD not found!!")
@@ -853,6 +855,7 @@ def XrdCopy(wb, job_list: list, xrd_cp_args: XrdCpArgs, printout: str = '') -> l
     handler.wb = wb
     handler.xrdjob_list = job_list
     handler.printout = printout
+    handler.no_xrdzip = ('ALIENPY_NOXRDZIP' in os.environ) if no_xrdzip is None else no_xrdzip
     handler.successful_writes = []
     if DEBUG: handler.debug = True
 

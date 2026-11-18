@@ -461,7 +461,7 @@ def valid_regex(regex_str: str):
     """Validate a regex string and return a re.Pattern if valid"""
     regex = None
     try:
-        regex = re.compile(regex_str.encode('unicode-escape').decode())  # try to no hit https://docs.python.org/3.6/howto/regex.html#the-backslash-plague
+        regex = re.compile(regex_str)  # command line strings are already raw: no escaping (unicode-escape doubled every backslash)
     except re.error:
         logging.error('regex validation failed:: %s', regex_str)
     return regex  # noqa: R504

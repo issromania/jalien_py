@@ -60,7 +60,7 @@ from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, CA_PATH
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
                          get_arg, get_arg_multiple, get_arg_value, get_lfn_key, import_aliases, is_help, list_remove_item,
-                         md5, mk_xml_local, name2regex, queryML, signal_handler, unixtime2local, set_xattr_list)
+                         md5, mk_xml_local, name2regex, name_is_plain_regex, queryML, signal_handler, unixtime2local, set_xattr_list)
 # commands stack tools
 from .tools_stackcmd import deque_pop_pos, push2stack
 # shell related tools
@@ -1424,9 +1424,9 @@ Command format: find2 <options> <directory>
 N.B. directory to be search for must be last element of command
 -glob <globbing pattern> : this is the usual AliEn globbing format; {PrintColor(COLORS.BIGreen)}N.B. this is NOT a REGEX!!!{PrintColor(COLORS.ColorReset)} defaults to all "*"
 -select <pattern>        : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX applied to full path!!!{PrintColor(COLORS.ColorReset)}
--name <pattern>          : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX applied to a directory or file name!!!{PrintColor(COLORS.ColorReset)}
+-name <pattern>          : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX searched in the file name (last path component; ^ and $ anchor to the name), without spaces!!!{PrintColor(COLORS.ColorReset)}
 -name <verb>_string      : where verb = begin|contain|ends|ext and string is the text selection criteria.
-verbs are aditive  e.g. -name begin_myf_contain_run1_ends_bla_ext_root
+verbs are aditive  e.g. -name begin_myf_contain_run1_ends_bla_ext_root ; multiple contain (max 4) match in any order
 {PrintColor(COLORS.BIRed)}N.B. the text to be filtered cannot have underline i.e >_< within!!!{PrintColor(COLORS.ColorReset)}
 
 -exclude     string            : (client-side) exclude result containing this string
@@ -1489,10 +1489,11 @@ The server options:'''
         use_regex = True
         filtering_enabled = True
         pattern_regex = name2regex(name_arg)
+        if pattern_regex and name_is_plain_regex(name_arg): args.extend(['-name_re', name_arg])  # exact match on the file name, client-side
         if use_regex and not pattern_regex:
-            msg = ("-name :: No selection verbs were recognized!"
-                   "usage format is -name <attribute>_<string> where attribute is one of: begin, contain, ends, ext"
-                   f"The invalid pattern was: {pattern_regex}")
+            msg = ("-name :: invalid selection (see the messages above); "
+                   "usage format is -name <regex> or -name <verb>_<string> where verb is one of: begin, contain, ends, ext; "
+                   f"the invalid argument was: {name_arg}")
             return RET(22, '', msg)  # EINVAL /* Invalid argument */
 
     if use_regex: pattern = pattern_regex  # -select, -name usage overwrites glob usage

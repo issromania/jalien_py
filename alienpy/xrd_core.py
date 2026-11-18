@@ -22,7 +22,7 @@ from .global_vars import AlienSessionInfo, COLORS, REGEX_PATTERN_TYPE, specs_spl
 from .wb_api import SendMsg, retf_print
 from .tools_nowb import (GetHumanReadableSize, PrintColor, common_path, create_metafile, deltat_ms_perf,
                          fileIsValid, fileline2list, format_dst_fn, get_arg, get_arg_value, get_arg_value_multiple, get_hash_meta, get_lfn_key, get_lfn_name, get_size_meta,
-                         set_xattr_list, is_help, is_int, list_files_local, make_tmp_fn, md5, name2regex, now_str, path_local_stat, path_writable_any, valid_regex)
+                         set_xattr_list, is_help, is_int, list_files_local, make_tmp_fn, md5, name2regex, name_is_plain_regex, now_str, path_local_stat, path_writable_any, valid_regex)
 from .xrd_tools import commitFileList, expand_path_grid, extract_glob_pattern, lfn2fileTokens, list_files_grid, path_grid_stat, path_type, pathtype_grid, xrdcp_help, lfnIsValid
 
 HAS_XROOTD = False
@@ -544,10 +544,11 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
         use_regex = True
         filtering_enabled = True
         pattern_regex = name2regex(name_arg)
+        if pattern_regex and name_is_plain_regex(name_arg): find_args.extend(['-name_re', name_arg])  # exact match on the file name, client-side
         if use_regex and not pattern_regex:
-            msg = ("-name :: No selection verbs were recognized!"
-                   "usage format is -name <attribute>_<string> where attribute is one of: begin, contain, ends, ext"
-                   f"The invalid pattern was: {pattern_regex}")
+            msg = ("-name :: invalid selection (see the messages above); "
+                   "usage format is -name <regex> or -name <verb>_<string> where verb is one of: begin, contain, ends, ext; "
+                   f"the invalid argument was: {name_arg}")
             return RET(22, '', msg)  # EINVAL /* Invalid argument */
 
     if use_regex: pattern = pattern_regex

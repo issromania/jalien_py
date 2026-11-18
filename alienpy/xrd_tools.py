@@ -249,9 +249,9 @@ For the recursive copy of directories the following options (of the find command
 Further filtering of the files can be applied with the following options:
 -glob    <globbing pattern> : this is the usual AliEn globbing format; {PrintColor(COLORS.BIGreen)}N.B. this is NOT a REGEX!!!{PrintColor(COLORS.ColorReset)} defaults to all "*"
 -select  <pattern>          : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX applied to full path!!!{PrintColor(COLORS.ColorReset)}
--name    <pattern>          : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX applied to a directory or file name!!!{PrintColor(COLORS.ColorReset)}
+-name    <pattern>          : select only these files to be copied; {PrintColor(COLORS.BIGreen)}N.B. this is a REGEX searched in the file name (last path component; ^ and $ anchor to the name), without spaces!!!{PrintColor(COLORS.ColorReset)}
 -name    <verb>_string      : where verb = begin|contain|ends|ext and string is the text selection criteria.
-verbs are aditive  e.g. -name begin_myf_contain_run1_ends_bla_ext_root
+verbs are aditive  e.g. -name begin_myf_contain_run1_ends_bla_ext_root ; multiple contain (max 4) match in any order
 {PrintColor(COLORS.BIRed)}N.B. the text to be filtered cannot have underline i.e >_< within!!!{PrintColor(COLORS.ColorReset)}
 
 -exclude     string            : (client-side) exclude result containing this string
@@ -367,6 +367,9 @@ def list_files_grid(wb, search_dir: str, pattern: Union[re.Pattern[str], str, No
     exclude_str_list = get_arg_value_multiple(find_args_list, '-exclude')
     for ex_str_pat in exclude_str_list:
         filter_args_list.extend(['-exclude', ex_str_pat])
+
+    name_re = get_arg_value(find_args_list, '-name_re')  # -name plain regex: client-side match on the file name
+    if name_re: filter_args_list.extend(['-name_re', name_re])
 
     compiled_regex_list = []
     exclude_re_arg_list = get_arg_value_multiple(find_args_list, '-exclude_re')

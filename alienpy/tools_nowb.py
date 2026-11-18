@@ -470,14 +470,27 @@ def valid_regex(regex_str: str):
     return regex  # noqa: R504
 
 
+def name_is_plain_regex(pattern: str) -> bool:
+    """Return True if the -name argument is a plain regex, i.e. has no begin/contain/ends/ext verb as a _ delimited token"""
+    return not any(verb in pattern.split('_') for verb in ('begin', 'contain', 'ends', 'ext'))
+
+
 def name2regex(pattern_regex: str = '') -> str:
-    """Convert -name/-select argument of cp/find2 to regex form"""
+    """Convert -name/-select argument of cp/find2 to regex form
+    For a plain regex the returned regex is only a pre-selection: the exact match on the file name is done by filter_file_prop(-name_re)"""
     if not pattern_regex: return ''
     translated_pattern_regex = ''
     re_all = '.*'
     re_all_end = '[^/]*'
     verbs = ('begin', 'contain', 'ends', 'ext')
     pattern_list = pattern_regex.split('_')
+    if name_is_plain_regex(pattern_regex):
+        if valid_regex(pattern_regex) is None:
+            print_out(f'invalid regex in the name selection: {pattern_regex}')
+            return ''
+        # pre-selection that cannot miss a matching name: the server applies it after the searched dir, locally it is matched against the full path.
+        # a ^ inside would anchor at the start of the whole string, not of the name: then pre-select everything
+        return re_all if '^' in pattern_regex else f'{re_all}({pattern_regex})'
     if any(verb in pattern_list for verb in verbs):  # verbs are whole _ delimited tokens
         if pattern_list.count('begin') > 1 or pattern_list.count('ends') > 1 or pattern_list.count('ext') > 1:
             print_out('<begin>, <ends>, <ext> verbs cannot appear more than once in the name selection')
@@ -955,6 +968,10 @@ def filter_file_prop(f_obj: dict, base_dir: str, find_opts: Union[str, list, Non
     for compiled_regex in compiled_regex_list:
         match = compiled_regex.search(relative_lfn)
         if match: return False
+
+    # -name plain regex: re.search on the file name (last path component)
+    name_re = get_arg_value(opts, '-name_re')
+    if name_re and not re.search(name_re, os.path.basename(lfn.rstrip('/'))): return False
 
     min_size = get_arg_value(opts, '-minsize')
     if min_size:

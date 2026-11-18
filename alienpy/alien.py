@@ -1302,8 +1302,12 @@ N.B. EDITOR env var must be set or fallback will be mcedit (not checking if exis
         md5_end = md5(tmp)
         if md5_begin != md5_end:
             uploaded_file = upload_tmp(wb, tmp, ','.join(specs), dated_backup = versioned_backup)
-            os.remove(tmp)  # clean up the temporary file not matter if the upload was successful or not
-            return RET(0, f'Uploaded {uploaded_file}') if uploaded_file else RET(1, '', f'Error uploading {uploaded_file}')
+            if uploaded_file:
+                os.remove(tmp)
+                return RET(0, f'Uploaded {uploaded_file}')
+            # keep the edited content: take it out of the list of temporary files removed at exit
+            if tmp in AlienSessionInfo['templist']: AlienSessionInfo['templist'].remove(tmp)
+            return RET(1, '', f'Error uploading {lfn}; the edited file was kept as: {tmp}')
         return RET(0)
     return RET(1, '', f'Error downloading {lfn}, editing could not be done.')
 

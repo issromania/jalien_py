@@ -1083,7 +1083,11 @@ def upload_tmp(wb, temp_file_name: str, upload_specs: str = '', dated_backup: bo
     ret_obj = SendMsg(wb, 'mv', [lfn, lfn_backup])  # let's create a backup of old lfn
     if retf_print(ret_obj, 'debug') != 0: return ''
     tokens = lfn2fileTokens(wb, lfn2file(lfn, temp_file_name), [upload_specs], isWrite = True)
-    access_request = tokens['answer']
+    access_request = tokens.get('answer', {}) if tokens else {}
+    if not access_request.get('results'):  # no write access: put back the original lfn before bailing out
+        ret_obj = SendMsg(wb, 'mv', [lfn_backup, lfn])
+        retf_print(ret_obj, 'debug')
+        return ''
     replicas = access_request["results"][0]["nSEs"]
     if "disk:" not in upload_specs: upload_specs = f'disk:{replicas}'
     if upload_specs: upload_specs = f'@{upload_specs}'

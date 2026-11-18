@@ -191,6 +191,26 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
     return wb
 
 
+def wb_reconnect(wb: WebSocketClientProtocol) -> WebSocketClientProtocol:
+    """Replace a failed connection: restore ALIEN_SITE and the server-side cwd, record the new socket as ALIENPY_GLOBAL_WB"""
+    global ALIENPY_GLOBAL_WB
+    wb = AlienConnect(wb)  # it will exit the program if no connection is possible
+    ALIENPY_GLOBAL_WB = wb
+    # use wb_sendmsg directly (not SendMsg) to avoid a recursive reconnection
+    if SET_SITE:
+        try:
+            _ = retf_result2ret(wb_sendmsg(wb, CreateJsonCommand('setSite', [SET_SITE])))
+        except Exception:
+            logging.exception('wb_reconnect:: could not set site to %s', SET_SITE)
+    if 'AlienSessionInfo' in globals() and AlienSessionInfo['currentdir']:
+        try:
+            ret_cd = retf_result2ret(wb_sendmsg(wb, CreateJsonCommand('cd', [AlienSessionInfo['currentdir']], 'nomsg nokeys')))
+            if ret_cd.exitcode != 0: logging.error('wb_reconnect:: could not restore cwd %s : %s', AlienSessionInfo['currentdir'], ret_cd.err)
+        except Exception:
+            logging.exception('wb_reconnect:: could not restore cwd %s', AlienSessionInfo['currentdir'])
+    return wb
+
+
 def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = None, opts: str = '') -> RET:
     """Send a json message to the specified websocket; it will return the server answer"""
     if not wb:
@@ -231,7 +251,7 @@ def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = No
             result = wb_sendmsg(wb, jsonmsg)
         except Exception as e:
             logging.exception('SendMsg:: Error sending: %s\nBecause of %s', jsonmsg, e.__cause__)
-            wb = AlienConnect(wb)
+            wb = wb_reconnect(wb)
         if result is None: time.sleep(0.2)
     if time_begin: logging.debug('SendMsg::Result received: %s ms', deltat_ms_perf(time_begin))
 
@@ -282,7 +302,7 @@ def SendMsgMulti(wb: WebSocketClientProtocol, cmds_list: list, opts: str = '') -
         except wb_exceptions.ConnectionClosed as e:
             logging.exception('SendMsgMulti:: failure because of %s', e.__cause__)
             try:
-                wb = AlienConnect(wb)
+                wb = wb_reconnect(wb)
             except Exception:
                 logging.exception('SendMsgMulti:: Could not recover connection when disconnected!!')
         except Exception:

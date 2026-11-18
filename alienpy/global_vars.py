@@ -120,7 +120,7 @@ TIME_CONNECT = os.getenv('ALIENPY_TIMECONNECT', '')
 DEBUG_TIMING = os.getenv('ALIENPY_TIMING', '')  # enable really detailed timings in logs
 
 # Give information to central services that connection wise we want to be treateat as specified site
-SET_SITE = os.getenv('ALIEN_SITE', '')
+SET_SITE = os.getenv('ALIEN_SITE', '').strip()
 
 REGEX_PATTERN_TYPE = type(re.compile('.'))
 guid_regex = re.compile('[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}', re.IGNORECASE)  # regex for identification of GUIDs

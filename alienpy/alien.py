@@ -622,7 +622,7 @@ def DO_siteJobs(wb: WebSocketClientProtocol, args: list = None) -> RET:
     if not select_list: select_list = jobs_list_dict
 
     if show_only_id:
-        id_list = [job['id '] for job in select_list]
+        id_list = [str(job['id']) for job in select_list]
         return RET(0, f'{os.linesep.join(id_list)}', '', select_list)
 
     header = f'JobID{" " * 8}MasterJobID{" " * 2}Status{" " * 6}User{" " * 10}Name'

@@ -1,6 +1,7 @@
 """alienpy:: Misc tooling functions (local, not-networked usage)"""
 
 import ast
+import dataclasses
 import atexit
 import datetime
 import decimal
@@ -1067,7 +1068,7 @@ def mk_xml_local(filepath_list: list, coll_name: str = 'tempCollection') -> str:
     collection = ET.SubElement(xml_root, 'collection', attrib={'name': coll_name })
     for idx, item in enumerate(filepath_list, start = 1):
         e = ET.SubElement(collection, 'event', attrib={'name': str(idx)})
-        ET.SubElement(e, 'file', attrib = file2xml_el(lfn_prefix_re.sub('', item))._asdict())
+        ET.SubElement(e, 'file', attrib = dataclasses.asdict(file2xml_el(lfn_prefix_re.sub('', item))))
     oxml = ET.tostring(xml_root, encoding = 'ascii')
     dom = MD.parseString(oxml)  # nosec B318:blacklist
     return dom.toprettyxml()

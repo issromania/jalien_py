@@ -673,7 +673,9 @@ def get_hash_meta(meta_fn: str) -> tuple:
     """Extract hash value from metafile"""
     metaf_info = metaf2dict(meta_fn)
     if not metaf_info: return ('', '')
-    return ( metaf_info['metalink']['file']['hash']['@type'], metaf_info['metalink']['file']['hash']['#text'] )
+    hash_info = metaf_info['metalink']['file'].get('hash')  # absent if the lfn has no md5 registered (create_metafile skips it)
+    if not hash_info: return ('', '')
+    return ( hash_info.get('@type', ''), hash_info.get('#text', '') )
 
 
 def get_xattr_list(path: str) -> list:

@@ -298,7 +298,10 @@ def commitFileList(wb, lfnInfo_list: list) -> list:  # returns list of RET
                                                    file_commit.guid, file_commit.md5],
                                         'nokeys')
             commit_list.append(jsoncmd)
-        commit_results.extend(SendMsgMulti(wb, commit_list, 'log'))
+        batch_results = SendMsgMulti(wb, commit_list, 'log')
+        if len(batch_results) != len(commit_list):  # no answer for this batch: keep results aligned with lfnInfo_list
+            batch_results = [RET(70, '', f'commit:: no answer from server for {file_commit.lfn}') for file_commit in batch]  # ECOMM
+        commit_results.extend(batch_results)
     return commit_results
 
 

@@ -718,7 +718,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
 if HAS_XROOTD:
     class MyCopyProgressHandler(xrd_client.utils.CopyProgressHandler):
         """Custom ProgressHandler for XRootD copy process"""
-        __slots__ = ('wb', 'copy_failed_list', 'jobs', 'job_list', 'xrdjob_list', 'successful_writes', 'printout', 'debug')
+        __slots__ = ('wb', 'copy_failed_list', 'jobs', 'job_list', 'xrdjob_list', 'successful_writes', 'successful_write_jobs', 'printout', 'debug')
 
         def __init__(self) -> None:
             self.wb = None
@@ -727,6 +727,7 @@ if HAS_XROOTD:
             self.job_list = []
             self.xrdjob_list = []
             self.successful_writes = []
+            self.successful_write_jobs = []  # xrdjob of each successful_writes entry (same index)
             self.printout = ''
             self.debug = False
 
@@ -776,6 +777,7 @@ if HAS_XROOTD:
                     self.successful_writes.append(CommitInfo(envelope = replica_dict['envelope'], size = replica_dict['size'],
                                                             lfn = xrdjob.lfn, perm = '644', expire = '0',
                                                             pfn = replica_dict['url'], se = replica_dict['se'], guid = replica_dict['guid'], md5 = md5))
+                    self.successful_write_jobs.append(xrdjob)
                     # Add xattrs to remote file
                     # if 'ALIENPY_EXPERIMENTAL_XATTRS' in os.environ:
                         # pfn_dir = urlparse(replica_dict['url']).path
@@ -879,7 +881,8 @@ def XrdCopy(wb, job_list: list, xrd_cp_args: XrdCpArgs, printout: str = '') -> l
 
     if handler.successful_writes:  # if there were successful uploads/remote writes, let's commit them to file catalogue
         ret_list = commitFileList(wb, handler.successful_writes)
-        for ret in ret_list: retf_print(ret, 'noout err')
+        for ret, xrdjob in zip(ret_list, handler.successful_write_jobs):
+            if retf_print(ret, 'noout err') != 0: handler.copy_failed_list.append(xrdjob)  # not registered in catalogue: count as failed (and let recovery retry)
     return handler.copy_failed_list  # lets see what failed and try to recover
 
 

@@ -558,7 +558,7 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     if api_src and api_dst:
         for src,dst in zip(api_src, api_dst):
             retobj = makelist_lfn(wb, arg_source = src, arg_target = dst,
-                                  find_args = find_args, parent = parent,
+                                  find_args = find_args, parent = parent, truncate_basepath = truncate_basepath,
                                   overwrite = overwrite, pattern = pattern,
                                   is_regex = use_regex, strictspec = strictspec, httpurl = httpurl, copy_list = copy_lfnlist)
             if retobj.exitcode != 0: print_err(retobj.err)  # if any error let's just return what we got  # noqa: R504
@@ -567,11 +567,11 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
         if not cp_arg_list: return RET(1, '', f'Input file {inputfile_arg} not found or invalid content')
         for cp_line in cp_arg_list:
             cp_line_items = cp_line.strip().split()
-            if len(cp_line_items) > 2:
-                print_out(f'Line skipped, it has more than 2 arguments => f{cp_line.strip()}')
+            if len(cp_line_items) != 2:
+                print_out(f'Line skipped, it does not have exactly 2 arguments => {cp_line.strip()}')
                 continue
             retobj = makelist_lfn(wb, arg_source = cp_line_items[0], arg_target = cp_line_items[1],
-                                  find_args = find_args, parent = parent,
+                                  find_args = find_args, parent = parent, truncate_basepath = truncate_basepath,
                                   overwrite = overwrite, pattern = pattern,
                                   is_regex = use_regex, strictspec = strictspec, httpurl = httpurl, copy_list = copy_lfnlist)
             retf_print(retobj, "noout err")  # print error and continue with the other files

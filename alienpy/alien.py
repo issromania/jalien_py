@@ -220,7 +220,7 @@ def DO_exit(args: Optional[list] = None) -> Optional[RET]:
     code = AlienSessionInfo['exitcode']
     msg = ''
     if len(args) > 0:
-        if args[0].isdecimal(): code = args.pop(0)
+        if args[0].isdecimal(): code = int(args.pop(0))
         if args and (args[0] == 'stderr' or args[0] == 'err'):
             args.pop(0)
         if args: msg = ' '.join(args).strip()

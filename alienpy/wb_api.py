@@ -2,6 +2,8 @@
 
 import sys
 import os
+import atexit
+import asyncio
 import json
 import re
 import shlex
@@ -23,7 +25,7 @@ from websockets.protocol import State as WbState
 from .data_structs import RET, SSLctxException, WbRecvError
 from .setup_logging import DEBUG, DEBUG_FILE, print_err, print_out
 from .global_vars import ALIENPY_GLOBAL_WB, AlienSessionInfo, DEBUG_TIMING, TIME_CONNECT, TMPDIR, get_certs_names, SET_SITE
-from .async_tools import syncify
+from .async_tools import get_loop, syncify
 from .wb_async import IsWbConnected, wb_close, wb_create, wb_sendmsg, wb_sendmsg_multi
 from .tools_nowb import CreateJsonCommand, PrintDict, deltat_ms_perf, deltat_us_perf, isReachable, is_help, is_my_pid, path_readable, read_conf_file, writePidFile
 from .tools_stackcmd import push2stack  # , deque_pop_pos
@@ -223,6 +225,23 @@ def wb_live(wb: Optional[WebSocketClientProtocol]) -> Optional[WebSocketClientPr
     """If wb is a closed connection that was replaced (reconnection, token-init) return the current one (ALIENPY_GLOBAL_WB)"""
     if wb is not None and ALIENPY_GLOBAL_WB is not None and wb is not ALIENPY_GLOBAL_WB and wb.state is not WbState.OPEN: return ALIENPY_GLOBAL_WB
     return wb
+
+
+_WB_OWNER_PID = os.getpid()  # the process that owns the asyncio loop thread and the session connection
+WB_EXIT_CLOSE_TIMEOUT = 2  # seconds: upper bound of the exit delay if the server does not answer the close handshake
+
+
+@atexit.register
+def wb_close_at_exit() -> None:
+    """At exit close the session connection with a close frame (1000) instead of dropping the TCP connection (1006)"""
+    wb = ALIENPY_GLOBAL_WB
+    loop = get_loop()
+    if wb is None or wb.state is not WbState.OPEN or loop is None or not loop.is_running(): return
+    if os.getpid() != _WB_OWNER_PID: return  # forked child: no loop thread here, and the connection belongs to the parent
+    try:
+        asyncio.run_coroutine_threadsafe(wb.close(code = 1000, reason = 'Session end'), loop).result(timeout = WB_EXIT_CLOSE_TIMEOUT)
+    except Exception:
+        logging.debug('wb_close_at_exit:: close not completed', exc_info = True)
 
 
 def SendMsg(wb: WebSocketClientProtocol, cmdline: str, args: Optional[list] = None, opts: str = '') -> RET:

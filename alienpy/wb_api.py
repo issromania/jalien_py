@@ -467,7 +467,7 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
 def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> WebSocketClientProtocol:
     """Do the disconnect, connect with user cert, generate token, re-connect with token procedure"""
     wb = wb_live(wb)  # close/replace the current session connection, not a stale one held by the caller
-    wb_usercert = None
+    wb_usercert = wb  # if the session is already on usercert, generate the token on the current connection
     if not args: args = []
 
     if 'AlienSessionInfo' in globals() and not AlienSessionInfo['use_usercert']:

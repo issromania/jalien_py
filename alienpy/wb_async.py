@@ -147,7 +147,7 @@ async def wb_create(host: str = 'localhost', port: Union[str, int] = '8097', pat
                                        max_queue = QUEUE_SIZE, max_size = MSG_SIZE,
                                        ping_interval = PING_INTERVAL, ping_timeout = PING_TIMEOUT,
                                        open_timeout = OPEN_TIMEOUT, close_timeout = CLOSE_TIMEOUT,
-                                       user_agent_header = USER_AGENT, extra_headers = headers_list)
+                                       user_agent_header = USER_AGENT, additional_headers = headers_list)
         except Exception as e:
             msg = f'Could NOT establish connection (local socket) to {socket_filename}\nCheck the logfile: {DEBUG_FILE}'
             print_err(msg)

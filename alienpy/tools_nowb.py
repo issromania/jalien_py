@@ -12,6 +12,7 @@ import logging
 import multiprocessing as mp
 import socket
 import grp
+import itertools
 import pwd
 from pathlib import Path
 import os
@@ -496,11 +497,17 @@ def name2regex(pattern_regex: str = '') -> str:
             if tokenstr == 'ext': list_ext.append(KV(tokenstr, pattern_list[idx + 1]))
 
         if list_begin:
-            translated_pattern_regex = re_all + '/' + f'{list_begin[0].val}{re_all_end}'  # first string after the last slash (last match exclude /)
+            # (.*/)? : the name starts after the last /, or at the start of the string (server matches relative to the searched dir)
+            translated_pattern_regex = f'(.*/)?{list_begin[0].val}{re_all_end}'
         else:
             translated_pattern_regex = re_all  # once: contain, ends, ext alone must also match after any leading path
-        for patt in list_contain:
-            translated_pattern_regex = f'{translated_pattern_regex}{patt.val}{re_all_end}'
+        if list_contain:  # any order: alternation of all permutations (no lookahead, so it works also for the server regex engine)
+            contain_values = [patt.val for patt in list_contain]
+            if len(contain_values) > 4:
+                print_out('at most 4 <contain> verbs can be used in the name selection')
+                return ''
+            contain_alternatives = dict.fromkeys(''.join(f'{val}{re_all_end}' for val in perm) for perm in itertools.permutations(contain_values))
+            translated_pattern_regex = f'{translated_pattern_regex}({"|".join(contain_alternatives)})'
         if list_ends:
             translated_pattern_regex = f'{translated_pattern_regex}{list_ends[0].val}{re_all_end}'
         if list_ext:

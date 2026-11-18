@@ -203,10 +203,6 @@ class RET:
             if self.out and not ('noout' in opts or 'noprint' in opts): print(f'{self.out.strip()}', flush = True)
         return self.exitcode
 
-    def exitcode(self) -> int:
-        """Return exitcode"""
-        return self.exitcode
-
 
 @dataclass(frozen=True)
 class ALIEN_COLLECTION_EL():

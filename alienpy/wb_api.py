@@ -182,7 +182,7 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
         if cmdlist_func: cmdlist_func()
 
         # if this is a reconnection, make sure on the server we are in the last known current directory
-        if AlienSessionInfo['currentdir']: cd(wb, AlienSessionInfo['currentdir'], 'log')
+        if AlienSessionInfo['currentdir']: cd(wb, AlienSessionInfo['currentdir'], 'log nocheck')
 
         # if usercert connection always regenerate token if connected with usercert
         if AlienSessionInfo['use_usercert'] and token(wb, token_args) != 0:

@@ -1254,8 +1254,6 @@ def getCAcerts(custom_dir: str = '') -> RET:
         return RET(1, '', f'Could not find the destination directory: {CERT_DIR}')
     if not is_cmd('git'):
         return RET(1, '', 'git command not available')
-    if not is_cmd('rsync'):
-        return RET(1, '', 'rsync command not available')
 
     CA_DIR = f'{CERT_DIR}/certificates'
     CA_DIR_TEMP = f'{CERT_DIR}/aliencas_temp'
@@ -1268,19 +1266,40 @@ def getCAcerts(custom_dir: str = '') -> RET:
         return RET(1, '', 'Could not clone alien-cas repository!!!')
     shutil.rmtree(f'{CA_DIR_TEMP}/.git', ignore_errors= True)
 
-    if os.path.isdir(CA_DIR): shutil.rmtree(CA_DIR, ignore_errors= True)
-    Path(CA_DIR).mkdir(parents = True, exist_ok = True)
+    # the new CAs are prepared in CA_DIR_NEW; the present CA_DIR is replaced only when the new one is complete
+    CA_DIR_NEW = f'{CA_DIR}_new'
+    CA_DIR_OLD = f'{CA_DIR}_old'
+    for d in (CA_DIR_NEW, CA_DIR_OLD):
+        if os.path.isdir(d): shutil.rmtree(d, ignore_errors= True)
+    Path(CA_DIR_NEW).mkdir(parents = True, exist_ok = True)
 
-    result = runShellCMD(f'find {CA_DIR_TEMP} -type d -maxdepth 1 -mindepth 1 -exec rsync -av {{}}/ {CA_DIR} \\;', captureout = True, do_shell = True, timeout = 5)
-    if result.exitcode != 0:
-        return RET(1, '', 'Could not rsync content to destination!!!')
+    # the content of each directory of the repository goes in CA_DIR_NEW (find -exec rsync did not report a failed rsync)
+    try:
+        for ca_subdir in sorted(entry.path for entry in os.scandir(CA_DIR_TEMP) if entry.is_dir()):
+            shutil.copytree(ca_subdir, CA_DIR_NEW, symlinks = True, dirs_exist_ok = True)
+        copied_nr = len(os.listdir(CA_DIR_NEW))
+    except Exception as e:
+        copied_nr = 0
+        logging.exception(e)
     shutil.rmtree(f'{CA_DIR_TEMP}', ignore_errors= True)
+    if not copied_nr:
+        shutil.rmtree(CA_DIR_NEW, ignore_errors= True)
+        return RET(1, '', f'Could not copy the CAs to destination!!! {CA_DIR} is unchanged')
 
     # openssl rehash (openssl >= 1.1); fallback to c_rehash if it fails (older openssl: invalid command)
     # N.B. never run "openssl rehash" without arguments: it rehashes the default system certificate directories
-    result = runShellCMD(f'openssl rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
+    result = runShellCMD(f'openssl rehash {CA_DIR_NEW}', captureout = True, do_shell = True, timeout = 20)
     if result.exitcode != 0 and is_cmd('c_rehash'):
-        result = runShellCMD(f'c_rehash {CA_DIR}', captureout = True, do_shell = True, timeout = 20)
+        result = runShellCMD(f'c_rehash {CA_DIR_NEW}', captureout = True, do_shell = True, timeout = 20)
+
+    try:
+        if os.path.isdir(CA_DIR): os.rename(CA_DIR, CA_DIR_OLD)
+        os.rename(CA_DIR_NEW, CA_DIR)
+    except Exception as e:
+        if not os.path.isdir(CA_DIR) and os.path.isdir(CA_DIR_OLD): os.rename(CA_DIR_OLD, CA_DIR)  # put back the previous CAs
+        shutil.rmtree(CA_DIR_NEW, ignore_errors= True)
+        return RET(1, '', f'Could not move the new CAs in place: {e!r}; {CA_DIR} is unchanged')
+    shutil.rmtree(CA_DIR_OLD, ignore_errors= True)
 
     msg = f'Make sure to do "export X509_CERT_DIR={CA_DIR}" before the usage' if custom_dir else ''
     return RET(0, msg)

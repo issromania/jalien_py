@@ -810,7 +810,7 @@ if HAS_XROOTD:
                     lfn = replica_info['lfn']
                     size = replica_info['size']
                     md5 = replica_info['md5']
-                    ts = str(int(datetime.datetime.utcnow().timestamp() * 1000))
+                    ts = str(int(time.time() * 1000))  # unix time in ms; utcnow().timestamp() was shifted by the local UTC offset
                     # ts_r - timestamp for read  (when read by tool - avoid lack of access time of the filesystem)
                     # ts_wtimestamp for write (when downloaded)
                     attr_list = [('guid', guid), ('lfn', lfn), ('size', size), ('md5', md5), ('ts_r', ts), ('ts_w', ts)]
@@ -1127,7 +1127,7 @@ def sync_attr_from_alien(wb, lfn: str, filename: str) -> bool:
     alien_stat = alien_stat_query.ansdict['results'][0]
 
     if on_disk_md5 != alien_stat['md5'] : return False
-    ts = str(int(datetime.datetime.utcnow().timestamp() * 1000))
+    ts = str(int(time.time() * 1000))  # unix time in ms; utcnow().timestamp() was shifted by the local UTC offset
 
     attr_list_2update = [('guid', alien_stat['guid']), ('lfn', alien_stat['lfn']), ('size', alien_stat['size']), ('md5', alien_stat['md5']),
                          ('ts_r', ts), ('ts_w', ts)]

@@ -751,7 +751,7 @@ def set_xattr_ts(path, ts_value) -> bool:
 
 def update_xattr_ts(path: str) -> bool:
     '''Update ts_r xattr of a file'''
-    ts = str(int(datetime.datetime.utcnow().timestamp() * 1000))
+    ts = str(int(time.time() * 1000))  # unix time in ms; utcnow().timestamp() was shifted by the local UTC offset
     return set_xattr_ts(path, ts)
 
 

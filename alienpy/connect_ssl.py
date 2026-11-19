@@ -276,9 +276,10 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.options |= ssl.OP_NO_SSLv3
+    # INTENTIONAL: no hostname check; we connect to jbox/localhost or any other service that might not have the hostname in certificate
     ctx.check_hostname = False
 
-    # do not do CA verificattion for token, only for usercert
+    # INTENTIONAL: the server certificate is verified against the CAs only for usercert connections, not for token connections
     if not use_token:
         ctx.verify_mode = ssl.CERT_REQUIRED  # CERT_NONE, CERT_OPTIONAL, CERT_REQUIRED
         logging.info('SSL context:: Loading verify location:\n%s', CA_PATH)
@@ -288,7 +289,7 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
            logging.exception("SSL context:: Could not load verify location %s", CA_PATH, stack_info = True)
            raise SSLctxException(f'CA verify location could not be loaded, check content of >>> {CA_PATH} <<< : {type(e).__name__}: {e}') from e
     else:
-        ctx.verify_mode = ssl.CERT_NONE  # CERT_NONE, CERT_OPTIONAL, CERT_REQUIRED
+        ctx.verify_mode = ssl.CERT_NONE  # INTENTIONAL for token connections (JAliEn central services and JBox proxy particularities)
 
     if DEBUG: logging.debug('SSL context:: Loading cert,key pair:\n%s\n%s', cert, key)
     try:

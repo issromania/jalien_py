@@ -957,7 +957,7 @@ def filter_file_prop(f_obj: dict, base_dir: str, find_opts: Union[str, list, Non
 
     lfn = get_lfn_key(f_obj)
     if not base_dir.endswith('/'): base_dir = f'{base_dir}/'
-    relative_lfn = lfn.replace(base_dir, '')  # it will have N directories depth + 1 file components
+    relative_lfn = lfn[len(base_dir):] if lfn.startswith(base_dir) else lfn  # it will have N directories depth + 1 file components
 
     # string/pattern exclusion
     exclude_str_list = get_arg_value_multiple(opts, '-exclude')

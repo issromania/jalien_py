@@ -426,7 +426,9 @@ def list_files_grid(wb, search_dir: str, pattern: Union[re.Pattern[str], str, No
     compiled_regex_list = []
     exclude_re_arg_list = get_arg_value_multiple(find_args_list, '-exclude_re')
     for ex_re_pat in exclude_re_arg_list:
-        compiled_regex_list.append(re.compile(ex_re_pat))  # precompile the regex for exclusion
+        ex_regex = valid_regex(ex_re_pat)  # precompile the regex for exclusion
+        if ex_regex is None: return RET(22, '', f'list_files_grid:: invalid -exclude_re regex: {ex_re_pat}')  # EINVAL
+        compiled_regex_list.append(ex_regex)
 
     min_depth = get_arg_value(find_args_list, '-mindepth')
     if min_depth:

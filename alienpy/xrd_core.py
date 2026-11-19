@@ -247,6 +247,7 @@ def makelist_lfn(wb, arg_source: str, arg_target: str, find_args: Optional[list]
                     copy_list.append(CopyFile(src, dst_filename, isWrite, tokens['answer'], src))
         else:  # directory to be listed
             results_list = list_files_grid(wb, src, pattern, is_regex, find_args)
+            if results_list.exitcode == 22: return results_list  # EINVAL: invalid selection argument (e.g. -exclude_re regex)
             if "results" not in results_list.ansdict or len(results_list.ansdict["results"]) < 1:
                 msg = f"No files found with: find {' '.join(find_args) if find_args else ''}{' -r ' if is_regex else ''} -a -s {src} {pattern}"
                 return RET(42, '', msg)  # ENOMSG /* No message of desired type */
@@ -267,6 +268,7 @@ def makelist_lfn(wb, arg_source: str, arg_target: str, find_args: Optional[list]
 
     else:  # src is LOCAL, we are UPLOADING
         results_list = list_files_local(src, pattern, is_regex, " ".join(find_args))
+        if results_list.exitcode == 22: return results_list  # EINVAL: invalid selection argument (e.g. -exclude_re regex)
         if "results" not in results_list.ansdict or len(results_list.ansdict["results"]) < 1:
             msg = f"No files found in: {src} /pattern: {pattern} /find_args: {' '.join(find_args)}"
             return RET(42, '', msg)  # ENOMSG /* No message of desired type */

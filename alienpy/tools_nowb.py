@@ -888,7 +888,11 @@ def list_files_local(search_dir: str, pattern: Union[re.Pattern[str], str, None]
 
     filter_args_list = []
     if find_args: filter_args_list = find_args.split()  # for local files listing we have only filtering options
-    exclude_regex_list = [re.compile(ex_re) for ex_re in get_arg_value_multiple(filter_args_list, '-exclude_re')]  # exclusion regexes, as in list_files_grid
+    exclude_regex_list = []  # exclusion regexes, as in list_files_grid
+    for ex_re in get_arg_value_multiple(filter_args_list, '-exclude_re'):
+        ex_regex = valid_regex(ex_re)
+        if ex_regex is None: return RET(22, '', f'list_files_local:: invalid -exclude_re regex: {ex_re}')  # EINVAL
+        exclude_regex_list.append(ex_regex)
 
     file_list = None  # make a list of filepaths (that match a regex or a glob)
     if is_single_file:

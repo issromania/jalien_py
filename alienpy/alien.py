@@ -2054,7 +2054,12 @@ def JAlien(commands: Union[list, str, None] = None) -> int:
             exit_message()
 
         if not INPUT: continue
-        AlienSessionInfo['exitcode'] = ProcessCommandChain(ALIENPY_GLOBAL_WB, INPUT)
+        try:
+            AlienSessionInfo['exitcode'] = ProcessCommandChain(ALIENPY_GLOBAL_WB, INPUT)
+        except Exception:  # a failing command must not terminate the interactive shell; SystemExit (exit command, fatal errors) is not caught
+            logging.exception('Exception processing: %s', INPUT)
+            print_err(f'{PrintColor(COLORS.BIRed)}Exception encountered{PrintColor(COLORS.ColorReset)} processing: {INPUT}\nthe details are in the log file {DEBUG_FILE}')
+            AlienSessionInfo['exitcode'] = 1
     return AlienSessionInfo['exitcode']  # exit with the last command exitcode run in interactive mode
 
 

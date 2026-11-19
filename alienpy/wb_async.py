@@ -30,7 +30,7 @@ if not os.getenv('ALIENPY_NO_STAGGER'):
 
 from .setup_logging import DEBUG, DEBUG_FILE, print_err
 from .data_structs import SSLctxException, WbRecvError
-from .global_vars import DEBUG_TIMING, TMPDIR, USER_AGENT, ALIENPY_ADDRESS_FAMILY
+from .global_vars import DEBUG_TIMING, TMPDIR, USER_AGENT, get_address_family
 from .tools_nowb import deltat_ms_perf
 from .connect_ssl import make_connection_ctx, tls_cert_error_msg
 from .async_tools import start_asyncio, syncify
@@ -53,6 +53,7 @@ async def create_socket(host: str = 'localhost', port: Union[str, int] = '8097',
     socket_endpoint = None
 
     PROTO = socket.IPPROTO_TCP
+    ALIENPY_ADDRESS_FAMILY = get_address_family()  # read at each call: wb_create_tryout requests ipv4 (ALIENPY_NETWORKSTACK) for its last tries
     CONNECT_TIMEOUT = 0.3  # 300 milisec should be a good timeout for socket creation; do NOT use socket.setdefaulttimeout (process wide)
 
     init_begin_socket = None

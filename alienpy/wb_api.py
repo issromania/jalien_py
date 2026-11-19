@@ -41,10 +41,12 @@ def wb_create_tryout(host: str, port: Union[str, int], path: str = '/', use_user
     connect_tries_interval = float(os.getenv('ALIENPY_CONNECT_TRIES_INTERVAL', '0.3'))
 
     init_begin = time.perf_counter() if (TIME_CONNECT or DEBUG) else None
+    ipv4_fallback = False  # ALIENPY_NETWORKSTACK set below: only for these tries, it is removed at the end
     while wb is None:
         nr_tries += 1
         if not os.getenv('ALIENPY_NETWORKSTACK') and nr_tries > 2:  # we alreadyt tried twice and the user did not requested an IP stack
             os.environ["ALIENPY_NETWORKSTACK"] = "ipv4"  # let's try ipv4 only if the first 2 times did not work
+            ipv4_fallback = True
             if not os.getenv('ALIENPY_CONNECT_TRIES'): connect_tries = 4  # let's increase the tryouts if not user requested
 
         try:
@@ -62,6 +64,7 @@ def wb_create_tryout(host: str, port: Union[str, int], path: str = '/', use_user
                 logging.error('We tried on %s:%s%s %s times', host, port, path, nr_tries)
                 break
             time.sleep(connect_tries_interval)
+    if ipv4_fallback: del os.environ['ALIENPY_NETWORKSTACK']  # otherwise the next connections would be ipv4 only, with only 2 tries
 
     if init_begin:
         fail_msg = 'trials ' if not wb else ''

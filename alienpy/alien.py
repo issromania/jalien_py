@@ -401,6 +401,7 @@ def DO_pfn(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
         return RET(0, msg)
     args.insert(0, '-r')
     ret_obj = SendMsg(wb, 'whereis', args, opts = 'nomsg')
+    if ret_obj.exitcode != 0 or 'results' not in ret_obj.ansdict: return ret_obj  # error (e.g. lfn not found, no answer): return it as is
     msg = '\n'.join(str(item['pfn']) for item in ret_obj.ansdict['results'] if 'pfn' in item).strip()
     return dataclasses.replace(ret_obj, out = msg)
 
@@ -427,7 +428,7 @@ def DO_pfnstatus(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RE
             # we assume that it's a lfn
             file_path = expand_path_grid(arg)
             pfns_ret = DO_pfn(wb, [file_path])
-            pfn_list_found = [{'lfn': file_path, 'pfn': str(item['pfn'])} for item in pfns_ret.ansdict['results'] if 'pfn' in item]
+            pfn_list_found = [{'lfn': file_path, 'pfn': str(item['pfn'])} for item in pfns_ret.ansdict.get('results', []) if 'pfn' in item]  # no results: whereis failed
             pfn_list.extend(pfn_list_found)
 
     msg_all = None

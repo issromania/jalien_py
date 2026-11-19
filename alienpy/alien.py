@@ -1060,7 +1060,7 @@ def DO_2xml(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
     lfn_arg_list = args.copy()  # the rest of arguments are lfns
     if is_local:
         if do_append: return RET(1, '', 'toXml::local usage - appending to local xml is WIP, try without -a')
-        lfn_list_obj_list = [file2file_dict(filepath) for filepath in lfn_arg_list]
+        lfn_list_obj_list = [file2file_dict(filepath, do_md5 = False) for filepath in lfn_arg_list]  # only the path is used; mk_xml_local computes the md5
         if not lfn_list_obj_list: return RET(1, '', f'Invalid list of files: {lfn_arg_list}')
         lfn_list = [get_lfn_key(lfn_obj) for lfn_obj in lfn_list_obj_list if get_lfn_key(lfn_obj)]
         xml_coll = mk_xml_local(lfn_list)

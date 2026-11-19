@@ -906,7 +906,7 @@ def list_files_local(search_dir: str, pattern: Union[re.Pattern[str], str, None]
         return RET(2, '', f"No files found in :: {directory} /pattern: {pattern} /find_args: {find_args}")
 
     # convert the file_list to a list of file properties dictionaries
-    results_list = [file2file_dict(filepath) for filepath in file_list]
+    results_list = [file2file_dict(filepath, do_md5 = False) for filepath in file_list]  # md5 is not used by the callers (an upload computes it when requesting the envelope)
 
     results_list_filtered = []
     # items that pass the conditions are the actual/final results
@@ -931,8 +931,8 @@ def file_set_atime(path: str) -> None:
     os.utime(path, (datetime.datetime.now().timestamp(), file_stat.st_mtime))
 
 
-def file2file_dict(fn: str) -> dict:
-    """Take a string as path and return a dict with file properties"""
+def file2file_dict(fn: str, do_md5: bool = True) -> dict:
+    """Take a string as path and return a dict with file properties; md5 is empty if not do_md5 (reading the whole file is expensive)"""
     try:
         file_path = Path(fn)
     except Exception:
@@ -941,7 +941,7 @@ def file2file_dict(fn: str) -> dict:
     if not file_name.exists() or file_name.is_dir(): return {}
     file_stat = file_name.stat()
     return {'file': file_name.as_posix(), 'lfn': file_name.as_posix(), 'size': str(file_stat.st_size),
-            'mtime': str(int(file_stat.st_mtime * 1000)), 'md5': md5(file_name.as_posix()),
+            'mtime': str(int(file_stat.st_mtime * 1000)), 'md5': md5(file_name.as_posix()) if do_md5 else '',
             'owner': pwd.getpwuid(file_stat.st_uid).pw_name, 'gowner': gid2name(file_stat.st_gid)}
 
 

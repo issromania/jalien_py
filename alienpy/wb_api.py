@@ -451,6 +451,11 @@ def retf_print(ret_obj: RET, opts: str = '') -> int:
     return ret_obj.exitcode
 
 
+def _private_opener(path: str, flags: int) -> int:
+    """opener for open(): create a new file (not an existing one, not through a symlink) accessible only by the owner"""
+    return os.open(path, flags | os.O_EXCL, 0o600)
+
+
 def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
     """(Re)create the tokencert and tokenkey files"""
     if not wb: return 1
@@ -475,7 +480,7 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
         if path_readable(certs_info.token_cert):
             os.chmod(certs_info.token_cert, 0o600)  # make it writeable
             os.remove(certs_info.token_cert)
-        with open(certs_info.token_cert, "w", encoding = "ascii", errors = "replace") as tcert: print(f"{tokencert_content}", file = tcert)  # write the tokencert
+        with open(certs_info.token_cert, "w", encoding = "ascii", errors = "replace", opener = _private_opener) as tcert: print(f"{tokencert_content}", file = tcert)  # write the tokencert
         os.chmod(certs_info.token_cert, 0o400)  # make it readonly
     except Exception:
         print_err(f'Error writing to file the acquired token cert; check the log file {DEBUG_FILE}!')
@@ -486,7 +491,7 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
         if path_readable(certs_info.token_key):
             os.chmod(certs_info.token_key, 0o600)  # make it writeable
             os.remove(certs_info.token_key)
-        with open(certs_info.token_key, "w", encoding = "ascii", errors = "replace") as tkey: print(f"{tokenkey_content}", file = tkey)  # write the tokenkey
+        with open(certs_info.token_key, "w", encoding = "ascii", errors = "replace", opener = _private_opener) as tkey: print(f"{tokenkey_content}", file = tkey)  # write the tokenkey
         os.chmod(certs_info.token_key, 0o400)  # make it readonly
     except Exception:
         print_err(f'Error writing to file the acquired token key; check the log file {DEBUG_FILE}!')

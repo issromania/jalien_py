@@ -1153,8 +1153,8 @@ def DO_ps(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
     """ps : show and process ps output"""
     if args is None: args = []
     ret_obj = SendMsg(wb, 'ps', args)
-    if '-trace' in args:
-        nice_lines = [convert_time(str(msgline)) for item in ret_obj.ansdict['results'] for msgline in item['message'].split('\n')]
+    if '-trace' in args and ret_obj.exitcode == 0:  # an error (or no answer) is returned as is
+        nice_lines = [convert_time(str(msgline)) for item in ret_obj.ansdict.get('results', []) for msgline in str(item.get('message', '')).split('\n')]
         return dataclasses.replace(ret_obj, out = '\n'.join(nice_lines))
     return ret_obj
 

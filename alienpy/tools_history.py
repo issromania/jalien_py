@@ -3,6 +3,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 from .global_vars import AlienSessionInfo
 from .wb_api import lfn_list  # nosec PYL-W0614
@@ -38,17 +39,19 @@ def setupHistory(wb) -> None:
     rl.parse_and_bind("tab: complete")
     rl.set_completer_delims(" ")
 
-    def complete(text: str, state: str) -> list:
-        prompt_line = rl.get_line_buffer()
-        tokens = prompt_line.split()
-        results = []
-        if len(tokens) == 0:
-            results = [f'{x} ' for x in AlienSessionInfo['commandlist']]
-        elif len(tokens) == 1 and not prompt_line.endswith(' '):
-            results = [f'{x} ' for x in AlienSessionInfo['commandlist'] if x.startswith(text)] + [None]
-        else:
-            results = lfn_list(_wb_api.ALIENPY_GLOBAL_WB or wb, text) + [None]
-        return results[state]
+    matches = []  # readline calls complete() with state 0, 1, 2, ... until None: compute the matches (server listing) only for state 0
+
+    def complete(text: str, state: int) -> Optional[str]:
+        if state == 0:
+            prompt_line = rl.get_line_buffer()
+            tokens = prompt_line.split()
+            if len(tokens) == 0:
+                matches[:] = [f'{x} ' for x in AlienSessionInfo['commandlist']]
+            elif len(tokens) == 1 and not prompt_line.endswith(' '):
+                matches[:] = [f'{x} ' for x in AlienSessionInfo['commandlist'] if x.startswith(text)]
+            else:
+                matches[:] = lfn_list(_wb_api.ALIENPY_GLOBAL_WB or wb, text)
+        return matches[state] if state < len(matches) else None
 
     rl.set_completer(complete)
 

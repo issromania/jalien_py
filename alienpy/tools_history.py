@@ -52,8 +52,13 @@ def setupHistory(wb) -> None:
 
     rl.set_completer(complete)
 
+    saved_len = [rl.get_current_history_length()]  # history entries already in the file
+
     def startup_hook() -> None:
-        rl.append_history_file(1, histfile)  # before next prompt save last line
+        cur_len = rl.get_current_history_length()
+        if cur_len > saved_len[0]:  # before next prompt save the new line(s); an empty line adds nothing to the history
+            rl.append_history_file(cur_len - saved_len[0], histfile)
+            saved_len[0] = cur_len
     rl.set_startup_hook(startup_hook)
 
 

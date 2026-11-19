@@ -80,13 +80,6 @@ from .xrd_core import (DO_XrootdCp, HAS_XROOTD, download_tmp, upload_tmp, xrd_cl
 # Global XRootD preferences
 if HAS_XROOTD: xrd_config_init()
 
-# https://linux.die.net/man/2/setpgrp
-# equivalent of setpgid(0, 0) : PGID of the own process (ourself) is made the same as process ID (also self)
-try:
-    os.setpgrp()
-except Exception as e:
-    logging.exception(e)
-
 
 ##################################
 #   START FUNCTIONS DEFINITIONS

@@ -54,8 +54,8 @@ def signal_handler(sig, frame) -> None:  # pylint: disable=unused-argument
 
     print_out(f"\nCaught signal {sig}, let\'s exit")
 
-    # Send signal to all processes in the group
-    os.killpg(0, sig)
+    # Send signal to all processes in the group, only if it is our own group (not the one of a calling script/wrapper)
+    if os.getpgrp() == os.getpid(): os.killpg(0, sig)
     sys.exit(int(AlienSessionInfo['exitcode']))
 
 

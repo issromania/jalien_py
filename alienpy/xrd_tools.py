@@ -5,7 +5,7 @@ import os
 import re
 import shutil
 import sys
-from typing import Union
+from typing import Optional, Union
 import logging
 
 from .data_structs import CommitInfo, RET, STAT_FILEPATH, lfn2file
@@ -190,6 +190,23 @@ def path_grid_stat(wb, path: str) -> STAT_FILEPATH:
     """Get full information on a GRID path/lfn"""
     norm_path = expand_path_grid(path)
     ret_obj = SendMsg(wb, 'stat', [norm_path], opts = 'nomsg log')
+    return stat_answer2stat(ret_obj, norm_path)
+
+
+def path_grid_stat_list(wb, path_list: list) -> list:
+    """Get full information on a list of GRID paths/lfns; the requests are sent in pipelined batches (one round trip per batch)"""
+    stat_list: list = []
+    batch_size = 64
+    norm_path_list = [expand_path_grid(path) for path in path_list]
+    for batch in [norm_path_list[x: x + batch_size] for x in range(0, len(norm_path_list), batch_size)]:
+        ret_list = SendMsgMulti(wb, [CreateJsonCommand('stat', [norm_path], 'nomsg') for norm_path in batch], 'log')
+        if len(ret_list) != len(batch): ret_list = [RET(70, '', 'no answer from server') for _ in batch]  # ECOMM
+        stat_list.extend(stat_answer2stat(ret_obj, norm_path) for ret_obj, norm_path in zip(ret_list, batch))
+    return stat_list
+
+
+def stat_answer2stat(ret_obj: RET, norm_path: str) -> STAT_FILEPATH:
+    """Convert the answer of stat command for norm_path to STAT_FILEPATH"""
     if ret_obj.exitcode != 0: return STAT_FILEPATH(norm_path)
     file_stat = ret_obj.ansdict["results"][0]  # stat can query and return multiple results, but we are using only one
     mtime = file_stat.get('mtime', '')
@@ -200,13 +217,14 @@ def path_grid_stat(wb, path: str) -> STAT_FILEPATH:
                          mtime, guid, size, md5hash)
 
 
-def lfnIsValid(wb, lfn: str, local_file: str, shallow_check: bool = False, removeTarget: bool = True) -> RET:
-    """Check if remote lfn corresponds with local file (source is local, target is remote lfn); target will be removed if present and not match the source"""
+def lfnIsValid(wb, lfn: str, local_file: str, shallow_check: bool = False, removeTarget: bool = True, lfn_stat: Optional[STAT_FILEPATH] = None) -> RET:
+    """Check if remote lfn corresponds with local file (source is local, target is remote lfn); target will be removed if present and not match the source
+    lfn_stat: stat of the lfn when already known (otherwise it is requested)"""
     local_file_stat = None
     if os.path.isfile(local_file): local_file_stat = os.stat(local_file)
     if not local_file_stat: return RET(2, '', 'Missing local file')
 
-    lfn_stat = path_grid_stat(wb, lfn)  # check each destination lfn
+    if lfn_stat is None: lfn_stat = path_grid_stat(wb, lfn)  # check each destination lfn
     if not lfn_stat.size: return RET(2, '', '')
 
     if int(local_file_stat.st_size) != int(lfn_stat.size):

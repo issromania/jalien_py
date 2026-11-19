@@ -900,7 +900,7 @@ def list_files_local(search_dir: str, pattern: Union[re.Pattern[str], str, None]
     elif is_regex and regex:
         file_list = [os.path.join(root, f) for (root, _, files) in os.walk(directory) for f in files if regex.match(os.path.join(root, f))]
     else:
-        file_list = [p.expanduser().resolve(strict = True).as_posix() for p in list(Path(directory).glob(f'**/{pattern}')) if p.is_file()]
+        file_list = [p.as_posix() for p in list(Path(directory).glob(f'**/{pattern}')) if p.is_file()]  # not resolved: a symlink keeps its path below directory
 
     if not file_list:
         return RET(2, '', f"No files found in :: {directory} /pattern: {pattern} /find_args: {find_args}")
@@ -937,11 +937,8 @@ def file2file_dict(fn: str) -> dict:
         file_path = Path(fn)
     except Exception:
         return {}
-    try:
-        file_name = file_path.expanduser().resolve(strict = True)
-    except Exception:
-        return {}
-    if file_name.is_dir(): return {}
+    file_name = Path(os.path.abspath(file_path.expanduser()))  # symlinks are not resolved: the path of a link is kept, its target content is used
+    if not file_name.exists() or file_name.is_dir(): return {}
     file_stat = file_name.stat()
     return {'file': file_name.as_posix(), 'lfn': file_name.as_posix(), 'size': str(file_stat.st_size),
             'mtime': str(int(file_stat.st_mtime * 1000)), 'md5': md5(file_name.as_posix()),

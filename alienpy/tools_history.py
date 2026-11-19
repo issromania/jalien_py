@@ -1,7 +1,9 @@
 """alienpy:: Setup history for interactive shell"""
 
+import atexit
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -31,12 +33,19 @@ def setupHistory(wb) -> None:
     if os.getenv('ALIENPY_NO_HISTORY'): return
     if not HAS_READLINE or 'AlienSessionInfo' not in globals() or not wb: return
 
-    histfile = os.path.join(os.path.expanduser("~"), ".alienpy_history")
+    # libedit (e.g. python-build-standalone/uv builds) uses its own file format (header line, escaped spaces) and cannot read
+    # an empty or GNU readline history file (OSError EINVAL): keep its history in a separate file
+    is_libedit = getattr(rl, 'backend', '') == 'editline' or 'libedit' in (rl.__doc__ or '')
+    histfile = os.path.join(os.path.expanduser("~"), ".alienpy_history_libedit" if is_libedit else ".alienpy_history")
     if not os.path.exists(histfile): Path(histfile).touch(exist_ok = True)
     rl.set_history_length(-1)  # unlimited history
-    rl.read_history_file(histfile)
+    if os.path.getsize(histfile) > 0:  # an empty file is created with the first save
+        try:
+            rl.read_history_file(histfile)
+        except OSError as e:
+            logging.error('setupHistory:: could not read the history file %s : %s', histfile, e)
 
-    rl.parse_and_bind("tab: complete")
+    rl.parse_and_bind("bind ^I rl_complete" if is_libedit else "tab: complete")  # libedit has its own syntax
     rl.set_completer_delims(" ")
 
     matches = []  # readline calls complete() with state 0, 1, 2, ... until None: compute the matches (server listing) only for state 0
@@ -62,7 +71,8 @@ def setupHistory(wb) -> None:
         if cur_len > saved_len[0]:  # before next prompt save the new line(s); an empty line adds nothing to the history
             rl.append_history_file(cur_len - saved_len[0], histfile)
             saved_len[0] = cur_len
-    rl.set_startup_hook(startup_hook)
+    rl.set_startup_hook(startup_hook)  # GNU readline: saved before each prompt
+    atexit.register(startup_hook)  # libedit does not call the startup hook: saved at exit (nothing left to save with GNU readline)
 
 
 if __name__ == '__main__':

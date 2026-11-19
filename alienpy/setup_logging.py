@@ -11,7 +11,12 @@ from .global_vars import ALIENPY_FANCY_PRINT, TMPDIR, USER_HOME, rich_print
 #############################################
 
 DEBUG = os.getenv('ALIENPY_DEBUG', '')
+# -debug of the command line (taken out of sys.argv by main), as -debugfile below: the other modules import DEBUG by value after this
+if '-debug' in sys.argv[1:]: DEBUG = '1'
 DEBUG_FILE = os.getenv('ALIENPY_DEBUG_FILE', f'{USER_HOME}/alien_py.log')
+# -debugfile of the command line (taken out of sys.argv by main) must be known before the logging setup below:
+# the other modules import DEBUG_FILE after it and the logging cannot be set up again (basicConfig does nothing the 2nd time)
+if '-debugfile' in sys.argv[1:-1]: DEBUG_FILE = sys.argv[sys.argv.index('-debugfile', 1) + 1]
 
 
 def print_out(msg: str, toLog: bool = False) -> None:
@@ -52,6 +57,8 @@ def setup_logging(debug: bool = False, debug_file:str = f'{USER_HOME}/alien_py.l
         debug_file = f'{TMPDIR}/{os.path.basename(debug_file)}'
         try:
             logging.basicConfig(format = line_fmt, filename = debug_file, filemode = file_mode, level = MSG_LVL)
+            global DEBUG_FILE  # pylint: disable=global-statement
+            DEBUG_FILE = debug_file  # the messages "check the log file ..." of the other modules (imported after this) give the file really used
         except Exception:
             print_err(f'Could not write the log file {debug_file}')
 

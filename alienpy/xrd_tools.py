@@ -15,16 +15,15 @@ from .wb_api import SendMsg, SendMsgMulti, retf_print
 from .tools_nowb import CreateJsonCommand, PrintColor, create_metafile, filter_file_prop, get_arg, get_arg_value, get_arg_value_multiple, get_lfn_key, make_tmp_fn, valid_regex, md5
 
 
-def lfnAccessUrl(wb, lfn: str, local_file: str = '', specs: Union[None, list, str] = None, isWrite: bool = False, strictspec: bool = False, httpurl: bool = False) -> dict:
-    """Query central services for the access envelope of a lfn, it will return a lfn:server answer with envelope pairs"""
-    if not wb: return {}
-    if not lfn: return {}
+def access_args(lfn: str, local_file: str = '', specs: Union[None, list, str] = None, isWrite: bool = False, strictspec: bool = False, httpurl: bool = False) -> list:
+    """Return the arguments of the access command for the envelope of a lfn; empty list if the request cannot be made"""
+    if not lfn: return []
     if not specs: specs = []
     if specs and isinstance(specs, str): specs = specs_split.split(specs)
     if isWrite:
         if not local_file or not os.path.exists(local_file):
             print_err(f'lfnAccessUrl/write token:: invalid local file: {local_file}')
-            return {}
+            return []
         access_type = 'write'
         size = int(os.stat(local_file).st_size)
         # compute here as we will tell xrootd to compare with what was sent
@@ -41,6 +40,14 @@ def lfnAccessUrl(wb, lfn: str, local_file: str = '', specs: Union[None, list, st
     if specs: get_envelope_arg_list.append(",".join(specs))
     if httpurl: get_envelope_arg_list.insert(0, '-u')
     if strictspec: get_envelope_arg_list.insert(0, '-f')
+    return get_envelope_arg_list
+
+
+def lfnAccessUrl(wb, lfn: str, local_file: str = '', specs: Union[None, list, str] = None, isWrite: bool = False, strictspec: bool = False, httpurl: bool = False) -> dict:
+    """Query central services for the access envelope of a lfn, it will return a lfn:server answer with envelope pairs"""
+    if not wb: return {}
+    get_envelope_arg_list = access_args(lfn, local_file, specs, isWrite, strictspec, httpurl)
+    if not get_envelope_arg_list: return {}
     ret_obj = SendMsg(wb, 'access', get_envelope_arg_list, opts = 'nomsg')
     if ret_obj.exitcode != 0 or 'results' not in ret_obj.ansdict:
         ret_obj = dataclasses.replace(ret_obj, err = f'No token for {lfn} :: errno {ret_obj.exitcode} -> {ret_obj.err}')
@@ -99,6 +106,11 @@ def lfn2fileTokens(wb, arg_lfn2file: lfn2file, specs: Union[None, list, str] = N
     if not specs: specs = []
     if specs and isinstance(specs, str): specs = specs_split.split(specs)
     result = lfnAccessUrl(wb, lfn, file, specs, isWrite, strictspec, httpurl)
+    return access_answer2tokens(result, lfn, file, specs)
+
+
+def access_answer2tokens(result: dict, lfn: str, file: str, specs: list) -> dict:
+    """Return the lfn:answer pair for the access answer (result) of the lfn/file; the replicas get the info of the request"""
     if not result:
         return {"lfn": lfn, "answer": {}}
     qos_tags = [el for el in specs if 'ALICE::' not in el]  # for element in specs, if not ALICE:: then is qos tag
@@ -117,10 +129,32 @@ def lfn2fileTokens(wb, arg_lfn2file: lfn2file, specs: Union[None, list, str] = N
 def lfn2fileTokens_list(wb, input_lfn_list: list, specs: Union[None, list, str] = None, isWrite: bool = False, strictspec: bool = False, httpurl: bool = False) -> list:
     """Query central services for the access envelope of the list of lfns, it will return a list of lfn:server answer with envelope pairs"""
     if not wb: return []
-    access_list = []
+    access_list: list = []
     if not input_lfn_list: return access_list
-    if specs is None: specs = []
-    for l2f in input_lfn_list: access_list.append(lfn2fileTokens(wb, l2f, specs, isWrite, strictspec, httpurl))
+    if not specs: specs = []
+    if specs and isinstance(specs, str): specs = specs_split.split(specs)
+    batch_size = 64  # the requests of a batch are sent at once (pipelined): one round trip per batch instead of one per lfn
+    for batch in [input_lfn_list[x: x + batch_size] for x in range(0, len(input_lfn_list), batch_size)]:
+        cmd_list = []
+        cmd_idx = []  # index in batch of each request; lfns for which no request can be made get no answer
+        for idx, l2f in enumerate(batch):
+            args = access_args(l2f.lfn, l2f.file, specs, isWrite, strictspec, httpurl)
+            if not args: continue
+            cmd_list.append(CreateJsonCommand('access', args, 'nomsg'))
+            cmd_idx.append(idx)
+        ret_list = SendMsgMulti(wb, cmd_list) if cmd_list else []
+        if len(ret_list) != len(cmd_list):  # no answer for this batch
+            ret_list = [RET(70, '', 'no answer from server') for _ in cmd_list]  # ECOMM
+        answers = dict(zip(cmd_idx, ret_list))
+        for idx, l2f in enumerate(batch):
+            ret_obj = answers.get(idx)
+            result = {}
+            if ret_obj is not None:
+                if ret_obj.exitcode != 0 or 'results' not in ret_obj.ansdict:
+                    retf_print(dataclasses.replace(ret_obj, err = f'No token for {l2f.lfn} :: errno {ret_obj.exitcode} -> {ret_obj.err}'), opts = 'err noprint')
+                else:
+                    result = ret_obj.ansdict
+            access_list.append(access_answer2tokens(result, l2f.lfn, l2f.file, specs))
     return access_list
 
 

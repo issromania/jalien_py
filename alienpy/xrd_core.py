@@ -23,7 +23,7 @@ from .wb_api import SendMsg, retf_print
 from .tools_nowb import (GetHumanReadableSize, PrintColor, common_path, create_metafile, deltat_ms_perf,
                          fileIsValid, fileline2list, format_dst_fn, get_arg, get_arg_value, get_arg_value_multiple, get_hash_meta, get_lfn_key, get_lfn_name, get_size_meta,
                          set_xattr_list, is_help, is_int, list_files_local, make_tmp_fn, md5, name2regex, name_is_plain_regex, now_str, path_local_stat, path_writable_any, valid_regex)
-from .xrd_tools import commitFileList, expand_path_grid, extract_glob_pattern, lfn2fileTokens, list_files_grid, path_grid_stat, path_type, pathtype_grid, xrdcp_help, lfnIsValid
+from .xrd_tools import commitFileList, expand_path_grid, extract_glob_pattern, lfn2fileTokens, lfn2fileTokens_list, list_files_grid, path_grid_stat, path_type, pathtype_grid, xrdcp_help, lfnIsValid
 
 HAS_XROOTD = False
 # cp tunables as set by the user environment at start: DO_XrootdCp writes these keys in os.environ, which must not leak into the next cp
@@ -251,16 +251,19 @@ def makelist_lfn(wb, arg_source: str, arg_target: str, find_args: Optional[list]
                 msg = f"No files found with: find {' '.join(find_args) if find_args else ''}{' -r ' if is_regex else ''} -a -s {src} {pattern}"
                 return RET(42, '', msg)  # ENOMSG /* No message of desired type */
 
+            lfn2file_list = []
             for lfn_obj in results_list.ansdict["results"]:  # make CopyFile objs for each lfn
                 lfn = get_lfn_key(lfn_obj)
                 dst_filename = format_dst_fn(src, lfn, dst, parent, truncate_basepath)
                 # if overwrite the file validity checking will do md5
                 skip_file = retf_print(fileIsValid(dst_filename, lfn_obj['size'], lfn_obj['ctime'], lfn_obj['md5'], shallow_check = not overwrite), opts = 'noerr') == 0
                 if skip_file: continue  # destination exists and is valid, no point to re-download
+                lfn2file_list.append(lfn2file(lfn, dst_filename))
 
-                tokens = lfn2fileTokens(wb, lfn2file(lfn, dst_filename), specs_list, isWrite, strictspec, httpurl)
+            # the access requests are sent in batches (one round trip per batch)
+            for l2f, tokens in zip(lfn2file_list, lfn2fileTokens_list(wb, lfn2file_list, specs_list, isWrite, strictspec, httpurl)):
                 if not tokens or 'answer' not in tokens: continue
-                copy_list.append(CopyFile(lfn, dst_filename, isWrite, tokens['answer'], lfn))
+                copy_list.append(CopyFile(l2f.lfn, l2f.file, isWrite, tokens['answer'], l2f.lfn))
 
     else:  # src is LOCAL, we are UPLOADING
         results_list = list_files_local(src, pattern, is_regex, " ".join(find_args))
@@ -268,17 +271,19 @@ def makelist_lfn(wb, arg_source: str, arg_target: str, find_args: Optional[list]
             msg = f"No files found in: {src} /pattern: {pattern} /find_args: {' '.join(find_args)}"
             return RET(42, '', msg)  # ENOMSG /* No message of desired type */
 
+        lfn2file_list = []
         for local_file in results_list.ansdict["results"]:
             file_path = get_lfn_key(local_file)
             lfn = format_dst_fn(src, file_path, dst, parent, truncate_basepath)
 
             skip_file = retf_print(lfnIsValid(wb, lfn, file_path, shallow_check = not overwrite, removeTarget = True), opts = 'noerr') == 0
             if skip_file: continue  # destination exists and is valid, no point to re-upload
+            lfn2file_list.append(lfn2file(lfn, file_path))
 
-            tokens = lfn2fileTokens(wb, lfn2file(lfn, file_path), specs_list, isWrite, strictspec)
+        # the access requests are sent in batches (one round trip per batch)
+        for l2f, tokens in zip(lfn2file_list, lfn2fileTokens_list(wb, lfn2file_list, specs_list, isWrite, strictspec)):
             if not tokens or 'answer' not in tokens: continue
-
-            copy_list.append(CopyFile(file_path, lfn, isWrite, tokens['answer'], lfn))
+            copy_list.append(CopyFile(l2f.file, l2f.lfn, isWrite, tokens['answer'], l2f.lfn))
 
     return RET(1, '', error_msg) if error_msg else RET(0)
 

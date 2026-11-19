@@ -1295,7 +1295,7 @@ N.B. EDITOR env var must be set or fallback will be mcedit (not checking if exis
     tmp = download_tmp(wb, lfn, overwrite = False, verbose = False)
     if tmp and os.path.isfile(tmp):
         md5_begin = md5(tmp)
-        ret_obj = runShellCMD(f'{editor} {tmp}', captureout = False)
+        ret_obj = runShellCMD(f'{editor} {shlex.quote(tmp)}', captureout = False)  # the editor can have arguments; the tmp path keeps the lfn name, which can have spaces
         if ret_obj.exitcode != 0: return ret_obj  # noqa: R504
         md5_end = md5(tmp)
         if md5_begin != md5_end:

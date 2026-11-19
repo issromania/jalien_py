@@ -247,6 +247,7 @@ def DO_xrd_ping(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET
         return RET(1, '', 'XRootD module not present!!')
 
     count_arg = get_arg_value(args, '-c')
+    if count_arg and (not count_arg.isdigit() or int(count_arg) < 1): return RET(64, '', f'xrd_ping:: -c needs a positive integer, not: {count_arg}')  # EX_USAGE
     count = int(count_arg) if count_arg else 3
 
     sum_rez = []

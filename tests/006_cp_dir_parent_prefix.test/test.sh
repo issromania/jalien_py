@@ -56,8 +56,8 @@ alien.py cp -retry 3 -parent 2 -glob "*.log" "/alice/cern.ch/user/a/admin/refere
 FILE1="${TESTDIR_LOCAL}/referenceData/001/stdout.log"
 FILE2="${TESTDIR_LOCAL}/referenceData/001/stderr.log"
 
-stat "${FILE1}" &> /dev/null && { echo "OK"; rm -rf "${FILE}"; } || { echo "FAIL!! File1 not found in proper location"; exit 1; }
-stat "${FILE2}" &> /dev/null && { echo "OK"; rm -rf "${FILE}"; } || { echo "FAIL!! File2 not found in proper location"; exit 1; }
+stat "${FILE1}" &> /dev/null && { echo "OK"; rm -rf "${FILE1}"; } || { echo "FAIL!! File1 not found in proper location"; exit 1; }
+stat "${FILE2}" &> /dev/null && { echo "OK"; rm -rf "${FILE2}"; } || { echo "FAIL!! File2 not found in proper location"; exit 1; }
 
 alienpy_clean_testdir_local "${TESTDIR_LOCAL}"
 clean_logs
@@ -69,8 +69,8 @@ alien.py cp -retry 3 -rmprefix 5 -glob "*.log" "/alice/cern.ch/user/a/admin/refe
 FILE1="${TESTDIR_LOCAL}/referenceData/001/stdout.log"
 FILE2="${TESTDIR_LOCAL}/referenceData/001/stderr.log"
 
-stat "${FILE1}" &> /dev/null && { echo "OK"; rm -rf "${FILE}"; } || { echo "FAIL!! File1 not found in proper location"; exit 1; }
-stat "${FILE2}" &> /dev/null && { echo "OK"; rm -rf "${FILE}"; } || { echo "FAIL!! File2 not found in proper location"; exit 1; }
+stat "${FILE1}" &> /dev/null && { echo "OK"; rm -rf "${FILE1}"; } || { echo "FAIL!! File1 not found in proper location"; exit 1; }
+stat "${FILE2}" &> /dev/null && { echo "OK"; rm -rf "${FILE2}"; } || { echo "FAIL!! File2 not found in proper location"; exit 1; }
 
 alienpy_clean_testdir_local "${TESTDIR_LOCAL}"
 clean_logs

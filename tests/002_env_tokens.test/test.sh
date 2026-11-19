@@ -9,7 +9,7 @@ command -v alien.py &> /dev/null || { echo "alien.py command not found; skip tes
 export ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 clean_logs
 # Clear env if set
-unset ${JALIEN_TOKEN_CERT} ${JALIEN_TOKEN_KEY}
+unset JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY
 
 tokens_backup () {
 token1="$(realpath ${1})"
@@ -33,8 +33,11 @@ TMPDIR=${TMPDIR:-/tmp}
 FILECERT="${TMPDIR}/tokencert_$(id -u).pem"
 FILEKEY="${TMPDIR}/tokenkey_$(id -u).pem"
 
-# backup tokens
+[[ -f "${FILECERT}" && -f "${FILEKEY}" ]] || { echo "Token files ${FILECERT} ${FILEKEY} not found; run an alien.py command to have them created"; exit 1; }
+
+# backup tokens; they are put back at any exit
 tokens_backup "${FILECERT}" "${FILEKEY}"
+trap 'tokens_restore "${FILECERT}" "${FILEKEY}"' EXIT
 
 # check that error is thrown if tokens are missing
 echo "Check for failed exit code when no token present"
@@ -44,10 +47,12 @@ echo -e "Exit code: ${?} as expected\n"
 export JALIEN_TOKEN_CERT="$(< ${FILECERT}_backup)"
 export JALIEN_TOKEN_KEY="$(< ${FILEKEY}_backup)"
 echo "JALIEN_TOKEN_{CERT,KEY} exported, checking alien-token-info"
-alien-token-info || \
-{ echo -e "FAIL! alien-token-info command failed (it shouldn't!!)\n"; STATUS="1"; } && \
-{ echo -e "OK! valid tokens found in environment\n"; STATUS="0"; }
-[[ "${STATUS}" == "1" ]] && { tokens_restore "${FILECERT}" "${FILEKEY}"; exit ${STATUS}; }
+if alien-token-info; then
+    echo -e "OK! valid tokens found in environment\n"
+else
+    echo -e "FAIL! alien-token-info command failed (it shouldn't!!)\n"
+    exit 1
+fi
 echo
 
 echo "Checking a simple connection:"
@@ -55,6 +60,5 @@ alien.py pwd && \
 { echo "OK! valid connection to JAliEn services"; STATUS="0"; clean_logs; } || \
 { echo "FAIL! error connecting to JAliEn Services"; STATUS="1"; }
 
-tokens_restore "${FILECERT}" "${FILEKEY}";
 exit ${STATUS};
 

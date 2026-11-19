@@ -308,7 +308,9 @@ def make_connection_ctx(use_usercert: bool = False) -> ssl.SSLContext:
     certs_info = None
     user_cert = user_key = token_cert = token_key = ''
 
-    if 'AlienSessionInfo' in globals() and AlienSessionInfo['token_cert'] and AlienSessionInfo['token_key'] and AlienSessionInfo['user_cert'] and AlienSessionInfo['user_key']:
+    # the cached names are used only while the token is still valid (it can expire during a long session); otherwise re-check all
+    if 'AlienSessionInfo' in globals() and AlienSessionInfo['token_cert'] and AlienSessionInfo['token_key'] and AlienSessionInfo['user_cert'] and AlienSessionInfo['user_key'] \
+            and IsValidCert(AlienSessionInfo['token_cert']):
         user_cert, user_key = AlienSessionInfo['user_cert'], AlienSessionInfo['user_key']
         token_cert, token_key = AlienSessionInfo['token_cert'], AlienSessionInfo['token_key']
     else:

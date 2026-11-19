@@ -112,44 +112,46 @@ def get_ca_path() -> str:
     return capath_default
 
 
-def IsValidCert(fname: str) -> bool:
-    """Check if the certificate file (argument) is present and valid. It will return false also for less than 5min of validity"""
-    if not fname: return False
-    cert_bytes = None
+def cert_invalid_reason(fname: str) -> str:
+    """Return the reason for which the certificate file is not usable, empty string if valid; less than 10 min of validity is not valid"""
+    if not fname: return 'no certificate file name'
     try:
         with open(fname, "rb") as f: cert_bytes = f.read()
     except FileNotFoundError:
-        if not I_AM_GRID_JOB:
-            logging.error('IsValidCert:: certificate file %s not found', fname)
-            base_fname = os.path.basename(fname)
-            if 'tokencert' in base_fname or 'token' in base_fname:
-                logging.error('IsValidCert:: This is a token check, it is normal to be missing')
-        return False
-    except Exception as e:
-        if DEBUG: logging.exception(e)
-        logging.error('IsValidCert:: Unknown exception reading %s', fname)
-        return False
+        return f'certificate file {fname} not found'
+    except OSError as e:
+        return f'certificate file {fname} cannot be read: {e.strerror}'
+    if not cert_bytes: return f'certificate file {fname} is empty'
 
-    if cert_bytes is None:
-        msg = f'IsValidCert:: {fname} read but empty!'
-        logging.error(msg)
-        return False
-
-    x509cert = None
     try:
         x509cert = x509.load_pem_x509_certificate(cert_bytes)
     except Exception as e:
-        if DEBUG: logging.exception(e)
-        logging.error('IsValidCert:: Unable to load certificate %s', fname)
-        return False
+        return f'certificate file {fname} is not a valid PEM certificate: {e}'
 
     time_remaining = int(x509cert.not_valid_after_utc.timestamp()) - int(datetime.datetime.now(datetime.timezone.utc).timestamp())
-
     if time_remaining < 600:
-        msg = f'IsValidCert:: Expired certificate {fname}'
-        if DEBUG: print_err(msg)
-        logging.error(msg)
-    return time_remaining >= 600
+        return f'certificate {fname} is expired (not valid after {x509cert.not_valid_after_utc:%Y-%m-%d %H:%M:%S} UTC, or less than 10 min left)'
+    return ''
+
+
+def IsValidCert(fname: str) -> bool:
+    """Check if the certificate file (argument) is present and valid. It will return false also for less than 10 min of validity"""
+    if not fname: return False
+    reason = cert_invalid_reason(fname)
+    if not reason: return True
+    if not os.path.exists(fname):  # normal for the token before its first creation and for the usercert of GRID jobs
+        if not I_AM_GRID_JOB: logging.info('IsValidCert:: %s', reason)
+    else:
+        if DEBUG: print_err(f'IsValidCert:: {reason}')
+        logging.error('IsValidCert:: %s', reason)
+    return False
+
+
+def cred_invalid_reason(cert: str, key: str) -> str:
+    """Return the reason for which the cert/key pair cannot be used, empty string if no problem was found"""
+    reason = cert_invalid_reason(cert)
+    if not reason and not path_readable(key): reason = f'key file {key} not found or not readable'
+    return reason
 
 
 def get_valid_certs() -> tuple:
@@ -315,8 +317,12 @@ def make_connection_ctx(use_usercert: bool = False) -> ssl.SSLContext:
         token_cert, token_key = certs_info.token_cert, certs_info.token_key
 
     # Check the presence of user certs and bailout before anything else
-    if not token_cert and not user_cert:
-        raise SSLctxException(f'no valid user certificate or token found!! check {DEBUG_FILE} for further information and contact the developer if the information is not clear.')
+    # a missing or expired token is normal (a new one is created after the connection with the usercert): the usercert problem is the one to report
+    # GRID jobs have only the token
+    if not token_cert and not user_cert and I_AM_GRID_JOB:
+        raise SSLctxException(f'no valid token found!! {cred_invalid_reason(TOKENCERT_NAME, TOKENKEY_NAME) or "unknown problem"}')
+    if not user_cert and (use_usercert or not token_cert):
+        raise SSLctxException(f'no valid user certificate found!! {cred_invalid_reason(USERCERT_NAME, USERKEY_NAME) or "unknown problem"}')
 
     return create_ssl_context(use_usercert, user_cert = user_cert, user_key = user_key, token_cert = token_cert, token_key = token_key)
 

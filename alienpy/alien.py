@@ -48,7 +48,7 @@ setup_logging(bool(DEBUG), DEBUG_FILE)  # Initialize logging
 ##   IMPORT DATA STRUCTURES
 from .data_structs import RET
 ##   IMPORT GLOBAL VARIABLES
-from .global_vars import ALIENPY_EXECUTABLE, ALIENPY_GLOBAL_WB, AlienSessionInfo, COLORS, TOKENCERT_NAME, USER_AGENT_HTTP, cmds_split, lfn_prefix_re, specs_split, time_pattern_match_13
+from .global_vars import ALIENPY_EXECUTABLE, ALIENPY_GLOBAL_WB, AlienSessionInfo, COLORS, TOKENCERT_NAME, TOKENKEY_NAME, USERCERT_NAME, USERKEY_NAME, USER_AGENT_HTTP, cmds_split, lfn_prefix_re, specs_split, time_pattern_match_13
 ##   IMPORT VERSION STRINGS
 from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION_STR
 ##   ASYNCIO MECHANICS
@@ -1686,42 +1686,42 @@ def DO_certinfo(args: Optional[list] = None) -> RET:
     """Print user certificate information"""
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Print user certificate information", "")
-    return CertInfo(AlienSessionInfo['user_cert'])
+    return CertInfo(AlienSessionInfo['user_cert'] or USERCERT_NAME)  # session value is set only if valid
 
 
 def DO_tokeninfo(args: Optional[list] = None) -> RET:
     """Print token certificate information"""
     if not args: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Print token certificate information", "")
-    return CertInfo(AlienSessionInfo['token_cert'])
+    return CertInfo(AlienSessionInfo['token_cert'] or TOKENCERT_NAME)  # session value is set only if valid
 
 
 def DO_certverify(args: Optional[list] = None) -> RET:
     """Verify the user cert against the found CA stores (file or directory)"""
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Verify the user cert against the found CA stores (file or directory)", "")
-    return CertVerify(AlienSessionInfo['user_cert'])
+    return CertVerify(AlienSessionInfo['user_cert'] or USERCERT_NAME)  # session value is set only if valid
 
 
 def DO_tokenverify(args: Optional[list] = None) -> RET:
     """Print token certificate information"""
     if not args: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Print token certificate information", "")
-    return CertVerify(AlienSessionInfo['token_cert'])
+    return CertVerify(AlienSessionInfo['token_cert'] or TOKENCERT_NAME)  # session value is set only if valid
 
 
 def DO_certkeymatch(args: Optional[list] = None) -> RET:
     """Check match of user cert with key cert"""
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Check match of user cert with key cert", "")
-    return CertKeyMatch(AlienSessionInfo['user_cert'], AlienSessionInfo['user_key'])
+    return CertKeyMatch(AlienSessionInfo['user_cert'] or USERCERT_NAME, AlienSessionInfo['user_key'] or USERKEY_NAME)  # session values are set only if valid
 
 
 def DO_tokenkeymatch(args: Optional[list] = None) -> RET:
     """Check match of user token with key token"""
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Check match of user token with key token", "")
-    return CertKeyMatch(AlienSessionInfo['token_cert'], AlienSessionInfo['token_key'])
+    return CertKeyMatch(AlienSessionInfo['token_cert'] or TOKENCERT_NAME, AlienSessionInfo['token_key'] or TOKENKEY_NAME)  # session values are set only if valid
 
 
 def DO_getCAcerts(args: Optional[list] = None) -> RET:

@@ -1063,16 +1063,10 @@ def get_pfn_list(wb, lfn: str) -> list:
 def download_tmp(wb, lfn: str, overwrite: bool = False, verbose: bool = False) -> str:
     """Download a lfn to a temporary file, it will return the file path of temporary"""
     tmpfile = make_tmp_fn(expand_path_grid(lfn))
-    if os.path.isfile(tmpfile):
-        if overwrite:
-            os.remove(tmpfile)
-            if tmpfile in AlienSessionInfo['templist']: AlienSessionInfo['templist'].remove(tmpfile)
-        else:
-            if tmpfile not in AlienSessionInfo['templist']: AlienSessionInfo['templist'].append(tmpfile)
-            return tmpfile
-
+    if overwrite and os.path.isfile(tmpfile): os.remove(tmpfile)
     if tmpfile in AlienSessionInfo['templist']: AlienSessionInfo['templist'].remove(tmpfile)  # just in case it is still in list
-    ret_obj = DO_XrootdCp(wb, xrd_copy_command = ['-fastcheck'], api_src = [f'{lfn}'], api_dst = [f'file:{tmpfile}'], printout = 'silent')  # print only errors for temporary downloads
+    # an already present tmpfile is checked by DO_XrootdCp against the lfn (size, mtime, md5 with -f): kept if valid, otherwise downloaded again
+    ret_obj = DO_XrootdCp(wb, xrd_copy_command = ['-f'], api_src = [f'{lfn}'], api_dst = [f'file:{tmpfile}'], printout = 'silent')  # print only errors for temporary downloads
 
     if ret_obj.exitcode == 0 and os.path.isfile(tmpfile):
         AlienSessionInfo['templist'].append(tmpfile)

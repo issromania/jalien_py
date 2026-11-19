@@ -1527,7 +1527,7 @@ def DO_quota(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
     fquota_dict = fquota_out.ansdict
 
     if 'results' not in jquota_dict or 'results' not in fquota_dict or not jquota_dict['results'] or not fquota_dict['results']:
-        msg = f'jquota exitcode: {jquota_dict["metadata"]["exitcode"]}\n{jquota_dict["metadata"]["error"]}\nfquota exitcode: {fquota_dict["metadata"]["exitcode"]}\n{fquota_dict["metadata"]["error"]}'
+        msg = f'jquota exitcode: {jquota_out.exitcode}\n{jquota_out.err}\nfquota exitcode: {fquota_out.exitcode}\n{fquota_out.err}'  # ansdict is empty if no answer
         return RET(1, '', f'Something went wrong with the command arguments and got empty results\n{msg}')
 
     # It is possible to do this for multiple users, but no use-case for this
@@ -1537,18 +1537,22 @@ def DO_quota(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
 
     username = jquota_info["username"]
 
+    def perc(used: float, max_val: float) -> str:
+        """used/max_val in percent; n/a for a maximum of 0"""
+        return f'{(used / max_val) * 100:.2f}%' if max_val else 'n/a'
+
     running_time = float(jquota_info["totalRunningTimeLast24h"]) / 3600
     running_time_max = float(jquota_info["maxTotalRunningTime"]) / 3600
-    running_time_perc = (running_time / running_time_max) * 100
+    running_time_perc = perc(running_time, running_time_max)
 
     cpucost = float(jquota_info["totalCpuCostLast24h"]) / 3600
     cpucost_max = float(jquota_info["maxTotalCpuCost"]) / 3600
-    cpucost_perc = (cpucost / cpucost_max) * 100
+    cpucost_perc = perc(cpucost, cpucost_max)
 
     unfinishedjobs_max = int(jquota_info["maxUnfinishedJobs"])
     waiting = int(jquota_info["waiting"])
     running = int(jquota_info["running"])
-    unfinishedjobs_perc = ((waiting + running) / unfinishedjobs_max) * 100
+    unfinishedjobs_perc = perc(waiting + running, unfinishedjobs_max)
 
     pjobs_nominal = int(jquota_info["nominalParallelJobs"])
     pjobs_max = int(jquota_info["maxParallelJobs"])
@@ -1557,19 +1561,19 @@ def DO_quota(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
     size_MiB = size / (1024 * 1024)
     size_max = float(fquota_info["maxTotalSize"])
     size_max_MiB = size_max / (1024 * 1024)
-    size_perc = (size / size_max) * 100
+    size_perc = perc(size, size_max)
 
     files = int(fquota_info["nbFiles"])
     files_max = int(fquota_info["maxNbFiles"])
-    files_perc = (files / files_max) * 100
+    files_perc = perc(files, files_max)
 
     msg = f"""Quota report for user : {username}
-Unfinished jobs(R + W / Max):\t\t{running} + {waiting} / {unfinishedjobs_max} --> {unfinishedjobs_perc:.2f}% used
-Running time (last 24h) used/max:\t{running_time:.2f}/{running_time_max:.2f}(h) --> {running_time_perc:.2f}% used
-CPU Cost (last 24h) used/max:\t\t{cpucost:.2f}/{cpucost_max:.2f}(h) --> {cpucost_perc:.2f}% used
+Unfinished jobs(R + W / Max):\t\t{running} + {waiting} / {unfinishedjobs_max} --> {unfinishedjobs_perc} used
+Running time (last 24h) used/max:\t{running_time:.2f}/{running_time_max:.2f}(h) --> {running_time_perc} used
+CPU Cost (last 24h) used/max:\t\t{cpucost:.2f}/{cpucost_max:.2f}(h) --> {cpucost_perc} used
 ParallelJobs (nominal/max) :\t{pjobs_nominal}/{pjobs_max}
-Storage size :\t\t\t{size_MiB:.2f}/{size_max_MiB:.2f} MiB --> {size_perc:.2f}%
-Number of files :\t\t{files}/{files_max} --> {files_perc:.2f}%"""
+Storage size :\t\t\t{size_MiB:.2f}/{size_max_MiB:.2f} MiB --> {size_perc}
+Number of files :\t\t{files}/{files_max} --> {files_perc}"""
     return RET(0, msg, '', quota_sum)
 
 

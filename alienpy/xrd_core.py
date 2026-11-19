@@ -445,7 +445,9 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     if y_arg_val: print_out("Ignored option! multiple source usage is known to break the files stored in zip files, so better to be ignored")
 
     batch_arg = get_arg_value(xrd_copy_command, '-T')
-    if batch_arg: batch = int(batch_arg)
+    if batch_arg:
+        if not is_int(batch_arg) or int(batch_arg) < 1: return RET(64, '', f'DO_XrootdCp:: -T needs a positive integer, not: {batch_arg}')  # EX_USAGE
+        batch = int(batch_arg)
 
     # options for envelope request
     strictspec = get_arg(xrd_copy_command, '-strictspec')
@@ -454,12 +456,16 @@ def DO_XrootdCp(wb, xrd_copy_command: Optional[list] = None, printout: str = '',
     # keep this many path components into destination filepath
     parent = int(0)
     parent_arg = get_arg_value(xrd_copy_command, '-parent')
-    if parent_arg: parent = int(parent_arg)
+    if parent_arg:
+        if not is_int(parent_arg): return RET(64, '', f'DO_XrootdCp:: -parent needs an integer, not: {parent_arg}')  # EX_USAGE
+        parent = int(parent_arg)
 
     # remove first N path components from full source path and keep the rest as basepath for destination
     truncate_basepath = int(0)
     rmprefix_arg = get_arg_value(xrd_copy_command, '-rmprefix')
-    if rmprefix_arg: truncate_basepath = int(rmprefix_arg)
+    if rmprefix_arg:
+        if not is_int(rmprefix_arg): return RET(64, '', f'DO_XrootdCp:: -rmprefix needs an integer, not: {rmprefix_arg}')  # EX_USAGE
+        truncate_basepath = int(rmprefix_arg)
 
     # explicit specify a destination, the rest of arguments are source files
     dst_arg_specified = get_arg_value(xrd_copy_command, '-dst')

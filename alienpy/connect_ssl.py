@@ -386,7 +386,7 @@ def CertInfo(fname: str) -> RET:
 
 
 def CertVerify(fname: str) -> RET:
-    """Print certificate information (subject, issuer, notbefore, notafter)"""
+    """Verify the certificate against the CA location in use (CA_PATH)"""
     cert_bytes = None
     try:
         with open(fname, "rb") as f: cert_bytes = f.read()
@@ -418,7 +418,7 @@ def CertVerify(fname: str) -> RET:
         x509store.load_locations(cafile = cafile, capath = capath)
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(5, '', f'Could not load verify location >>> {CA_PATH} <<<')  # EIO /* I/O error */
+        return RET(5, '', f'Could not load verify location >>> {CA_PATH} <<< : {e}')  # EIO /* I/O error */
 
     store_ctx = OpenSSL.crypto.X509StoreContext(x509store, x509cert)
     try:
@@ -426,7 +426,7 @@ def CertVerify(fname: str) -> RET:
         return RET(0, f'SSL Verification {PrintColor(COLORS.BIGreen)}successful{PrintColor(COLORS.ColorReset)} for {fname}')
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(1, '', f'SSL Verification {PrintColor(COLORS.BIRed)}failed{PrintColor(COLORS.ColorReset)} for {fname}')
+        return RET(1, '', f'SSL Verification {PrintColor(COLORS.BIRed)}failed{PrintColor(COLORS.ColorReset)} for {fname} : {e} (CA location: {CA_PATH})')
 
 
 def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
@@ -437,7 +437,7 @@ def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
         x509cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert_bytes)
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(5, "", f'Could not load certificate >>>{cert_fname}<<<')  # EIO /* I/O error */
+        return RET(5, "", f'Could not load certificate >>>{cert_fname}<<< : {e}')  # EIO /* I/O error */
 
     key_bytes = None
     try:
@@ -445,24 +445,12 @@ def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
         x509key = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, key_bytes)
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(5, "", f'Could not load key >>>{key_fname}<<<')  # EIO /* I/O error */
+        return RET(5, "", f'Could not load key >>>{key_fname}<<< : {e or type(e).__name__}')  # EIO /* I/O error */
 
+    # the CA certificates are not needed to check that the key belongs to the certificate
     ctx = OpenSSL.SSL.Context(OpenSSL.SSL.TLS_METHOD)  # skipcq: PTC-W6001
-    ctx.verify_mode = ssl.CERT_REQUIRED
     ctx.use_privatekey(x509key.to_cryptography_key())  # passing pyOpenSSL PKey/X509 objects is deprecated (pyOpenSSL >= 25)
     ctx.use_certificate(x509cert.to_cryptography())
-
-    cafile = capath = None
-    if os.path.isfile(CA_PATH):
-        cafile = CA_PATH
-    else:
-        capath = CA_PATH
-
-    try:
-        ctx.load_verify_locations(cafile = cafile, capath = capath)
-    except Exception as e:
-        if DEBUG: logging.exception(e)
-        return RET(5, "", f"Could not load verify location >>>{CA_PATH}<<<")  # EIO /* I/O error */
 
     try:
         ctx.check_privatekey()

@@ -1202,7 +1202,7 @@ def queryML(args: list = None) -> RET:
 
     try:
         url_req = urlreq.Request(url)
-        with urlreq.urlopen(url_req) as req:  # nosec
+        with urlreq.urlopen(url_req, timeout = 20) as req:  # nosec  # no timeout: a stalled server blocks forever
             ansraw = req.read().decode()
             exitcode = 0 if (req.getcode() == 200) else req.getcode()
         if type_default == type_json: ansdict = json.loads(ansraw)

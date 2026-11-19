@@ -18,7 +18,7 @@ alien.py mkdir "/alice/cern.ch/${TESTDIR}" &>> output.txt && { REZ="${?}"; echo 
 
 alien.py "stat /alice/cern.ch/user/a/admin/referenceData" &>> output.txt || { REZ="${?}"; echo "stat reference dir:: expected exitcode 0 but got ${REZ}"; exit "${REZ}"; }
 
-alien.py "stat /fail/no/valid" &>> output.txt && { REZ="${?}"; echo "stat invalid dir:: expected exitcode !=0 but got ${REZ}"; exit "${REZ}"; }
+alien.py "stat /fail/no/valid" &>> output.txt && { REZ="${?}"; echo "stat invalid dir:: expected exitcode !=0 but got ${REZ}"; exit 1; }
 
 clean_logs
 

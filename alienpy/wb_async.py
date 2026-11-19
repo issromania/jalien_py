@@ -32,7 +32,7 @@ from .setup_logging import DEBUG, DEBUG_FILE, print_err
 from .data_structs import SSLctxException, WbRecvError
 from .global_vars import DEBUG_TIMING, TMPDIR, USER_AGENT, ALIENPY_ADDRESS_FAMILY
 from .tools_nowb import deltat_ms_perf
-from .connect_ssl import make_connection_ctx
+from .connect_ssl import make_connection_ctx, tls_cert_error_msg
 from .async_tools import start_asyncio, syncify
 
 
@@ -195,6 +195,8 @@ async def wb_create(host: str = 'localhost', port: Union[str, int] = '8097', pat
         return None
     except Exception as e:
         msg = f'Could NOT establish connection (WebSocket) to {socket_endpoint_addr}:{socket_endpoint_port}\n{e!r}'
+        cert_msg = tls_cert_error_msg(e, getattr(ctx, 'alienpy_cert', ''))
+        if cert_msg: msg = f'{msg}\n{cert_msg}'
         print_err(f'{msg}\nCheck the logfile: {DEBUG_FILE}')
         logging.exception("%s", msg, stack_info = True)
         return None

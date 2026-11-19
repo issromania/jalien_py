@@ -298,8 +298,26 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
         logging.exception("SSL context:: Could not load cert/key pair:\nCert: %s\nKey: %s\nReason: %s", cert, key, reason, stack_info = True)
         raise SSLctxException(f'could not load cert/key pair (cert: {cert} ; key: {key}): {reason}') from e
 
+    ctx.alienpy_cert = cert  # type: ignore[attr-defined]  # for the error messages of the connection
     logging.info('\n... SSL context done.')
     return ctx
+
+
+def tls_cert_error_msg(e: BaseException, cert: str = '') -> str:
+    """Return an explanation if the TLS connection failure e is caused by a certificate, empty string otherwise"""
+    if isinstance(e, ssl.SSLCertVerificationError):
+        return (f'The server certificate could not be verified: {e.verify_message}\n'
+                f'Check the CA certificates (and their hash links) used for verification: {CA_PATH}\n'
+                'Either set X509_CERT_DIR to a directory with up-to-date IGTF CAs or run "alien.py getCAcerts" and set ALIENPY_USE_LOCAL_CAS=1')
+    reason = str(getattr(e, 'reason', None) or '') if isinstance(e, ssl.SSLError) else ''
+    if '_ALERT_' in reason and ('CERTIFICATE' in reason or reason.endswith('UNKNOWN_CA') or reason.endswith('ACCESS_DENIED')):
+        return (f'The server rejected the client certificate {cert} ({reason})\n'
+                'Check it with: alien.py cert-info ; alien.py cert-verify')
+    cause = e.__cause__ or e.__context__
+    if type(e).__name__ == 'InvalidMessage' and isinstance(cause, EOFError):  # websockets.exceptions.InvalidMessage, after the TLS handshake
+        return (f'The server closed the connection right after the TLS handshake, without HTTP answer: most probably it rejected the client certificate {cert}\n'
+                '(with TLS 1.3 the rejection is not reported to the client) Check it with: alien.py cert-info ; alien.py cert-verify')
+    return ''
 
 
 def make_connection_ctx(use_usercert: bool = False) -> ssl.SSLContext:

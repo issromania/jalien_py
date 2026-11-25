@@ -41,7 +41,7 @@ def _run(mainasync, *, debug = False):
         raise RuntimeError('asyncio.run() cannot be called from a running event loop')
 
     if not asyncio.coroutines.iscoroutine(mainasync):
-        raise ValueError('a coroutine was expected, got %s', mainasync)
+        raise ValueError(f'a coroutine was expected, got {mainasync!r}')
 
     if _alienpy_global_asyncio_loop is not None:
         raise RuntimeError('asyncio event loop already started')

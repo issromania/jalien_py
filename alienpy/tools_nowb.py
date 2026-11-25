@@ -236,7 +236,7 @@ def file2list(input_file: str) -> list:
     """Parse a file and return a list of elements"""
     if not input_file or not os.path.isfile(input_file): return []
     file_list = []
-    with open(input_file, encoding="ascii", errors="replace") as filecontent:
+    with open(input_file, encoding="utf-8", errors="replace") as filecontent:  # local paths can be non-ascii
         for line in filecontent:
             if not line or ignore_comments_re.search(line) or emptyline_re.match(line): continue
             file_list.extend(line.strip().split())
@@ -247,7 +247,7 @@ def fileline2list(input_file: str) -> list:
     """Parse a file and return a list of file lines"""
     if not input_file or not os.path.isfile(input_file): return []
     file_list = []
-    with open(input_file, encoding="ascii", errors="replace") as filecontent:
+    with open(input_file, encoding="utf-8", errors="replace") as filecontent:  # local paths can be non-ascii
         for line in filecontent:
             if not line or ignore_comments_re.search(line) or emptyline_re.match(line): continue
             file_list.extend([line.strip()])

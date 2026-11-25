@@ -2,8 +2,8 @@
 
 REPO="$(git rev-parse --show-toplevel)"
 
-ALIENPY_IS_CHANGED=$(git ls-files -m)
-[[ -n "${ALIENPY_IS_CHANGED}" ]] && touch ${REPO}/.commit_in_progress
+# the commit changes alienpy (staged changes, other than the version file): the version info is updated in post-commit
+git diff --cached --quiet -- alienpy/ ':!alienpy/version.py' || touch "${REPO}/.commit_in_progress"
 
 exit 0
 

@@ -18,11 +18,9 @@ from .data_structs import COLORS_COLL, CertsInfo
 try:
     from rich import print as rich_print
     from rich import print_json as rich_print_json
-    from rich.pretty import pprint as rich_pprint
-    from rich.console import Console
     # from rich.highlighter import ISO8601Highlighter, JSONHighlighter
 except Exception:
-    print("rich module could not be imported! Make sure you can do:\npython3 -c 'from rich.pretty import pprint'", file = sys.stderr, flush = True)
+    print("rich module could not be imported! Make sure you can do:\npython3 -c 'from rich import print'", file = sys.stderr, flush = True)
     sys.exit(1)
 
 wb_version = _meta_version('websockets')
@@ -64,7 +62,6 @@ ALIENPY_GLOBAL_WB = None
 
 # enable rich pretty printing
 ALIENPY_FANCY_PRINT = bool(os.getenv('ALIENPY_FANCY_PRINT'))
-RICH_CONSOLE = Console()
 
 ALIENPY_EXECUTABLE = ''
 

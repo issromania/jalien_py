@@ -23,7 +23,7 @@ jalien_server = os.getenv("ALIENPY_JCENTRAL", 'alice-jcentral.cern.ch')  # defau
 jalien_websocket_port = os.getenv("ALIENPY_JCENTRAL_PORT", '8097')  # websocket port
 jalien_websocket_path = '/websocket/json'
 connect_tries = int(os.getenv('ALIENPY_CONNECT_TRIES', 3))
-connect_tries_interval = int(os.getenv('ALIENPY_CONNECT_TRIES_INTERVAL', 0.5))
+connect_tries_interval = float(os.getenv('ALIENPY_CONNECT_TRIES_INTERVAL', '0.5'))
 use_usercert = False
 localConnect = False
 

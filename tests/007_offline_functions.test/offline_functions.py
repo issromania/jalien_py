@@ -103,6 +103,7 @@ def t_name2regex() -> None:
     check('contain order a b', sel('contain_std_contain_err', '/d/stderr.log'), True)
     check('contain order b a', sel('contain_err_contain_std', '/d/stderr.log'), True)
     check('contain no match', sel('contain_xyz', '/d/stderr.log'), False)
+    print('  (expected messages for the invalid -name selections:)', flush = True)
     for bad in ('begin_a_begin_b', 'ext_a_ext_b', 'begin', 'begin_a_ext',
                 'contain_a_contain_b_contain_c_contain_d_contain_e'):
         check(f'invalid verbs {bad!r}', name2regex(bad), '')
@@ -291,6 +292,7 @@ if __name__ == '__main__':
     try:
         for test in (t_expand_path_grid, t_expand_path_local, t_args, t_name2regex, t_format_dst_fn, t_list_files_local,
                      t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack):
+            print(f'Trying {test.__doc__.splitlines()[0]} ..', flush = True)
             try:
                 test()
             except Exception as e:

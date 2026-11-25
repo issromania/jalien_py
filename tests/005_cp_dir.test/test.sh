@@ -38,12 +38,21 @@ export XRD_LOGFILE=xrdlog_upload.txt
 alien.py cp "file:${TESTDIR_LOCAL}/" "${TESTDIR_REMOTE}/@disk:2,ALICE::CERN::EOS" &> out.log || { EXITCODE="${?}"; echo "Could not upload reference files in ${THIS_TEST}"; cat out.log; exit "${EXITCODE}"; }
 echo "OK"
 
-# get the number of uploaded files
-FOUND_REMOTE_FILES=$(alien.py find "${TESTDIR_REMOTE} .log" | grep ${TESTDIR_REMOTE} | wc -l)
+# the downloaded reference files (the upload source)
+shopt -s globstar nullglob
+LOCAL_FILES=( "${TESTDIR_LOCAL}"/**/*.log )
 GOOD_RESULT="4"
-echo -ne "Checking correct number of uploaded files .. "
-[[ "${FOUND_REMOTE_FILES}" -eq "${GOOD_RESULT}" ]] || { echo "Wrong count of files in ${THIS_TEST} but operations successful so far!! Send the logs to developer!"; exit 1; }
+echo -ne "Checking the number of downloaded reference files .. "
+[[ "${#LOCAL_FILES[@]}" -eq "${GOOD_RESULT}" ]] || { echo "Wrong count of downloaded files in ${THIS_TEST}: expected ${GOOD_RESULT}, found ${#LOCAL_FILES[@]} : ${LOCAL_FILES[*]}"; exit 1; }
 echo "OK"
+
+# each uploaded file must exist in the grid dir, at the same relative path
+for f in "${LOCAL_FILES[@]}"; do
+    REMOTE_FILE="${TESTDIR_REMOTE}/${f#"${TESTDIR_LOCAL}"/}"
+    echo -ne "Checking with stat the uploaded ${REMOTE_FILE} .. "
+    alien.py stat "${REMOTE_FILE}" &> out.log || { EXITCODE="${?}"; echo "FAIL: stat exitcode ${EXITCODE} in ${THIS_TEST} (upload reported success)"; cat out.log; alienpy_clean_testdir "${TESTDIR_REMOTE}" "${TESTDIR_LOCAL}"; exit 1; }
+    echo "OK"
+done
 
 # clean ci dir
 alienpy_clean_testdir "${TESTDIR_REMOTE}" "${TESTDIR_LOCAL}"

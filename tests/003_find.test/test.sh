@@ -10,8 +10,9 @@ THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
 
 GOOD_RESULT="4"
 EXITCODE="0"
+echo "Trying find of the .log files in referenceData (${GOOD_RESULT} expected) .."
 alien.py find '/alice/cern.ch/user/a/admin/referenceData .log' &> cmdout.txt || { EXITCODE="${?}"; echo "Error running alien_find in ${THIS_TEST}!"; cat cmdout.txt; exit "${EXITCODE}"; }
 
 FILE_COUNT=$(grep referenceData cmdout.txt | wc -l)
-[[ "${FILE_COUNT}" -eq "${GOOD_RESULT}" ]] && { clean_logs; exit "${EXITCODE}"; } || { echo "Wrong count of files in ${THIS_TEST}"; exit 1; }
+[[ "${FILE_COUNT}" -eq "${GOOD_RESULT}" ]] && { clean_logs; exit "${EXITCODE}"; } || { echo "Wrong count of files in ${THIS_TEST}: expected ${GOOD_RESULT}, found ${FILE_COUNT}"; cat cmdout.txt; exit 1; }
 

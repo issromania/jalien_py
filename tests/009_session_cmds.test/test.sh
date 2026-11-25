@@ -11,8 +11,8 @@ clean_logs
 export ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 export ALIENPY_NO_HISTORY=1  # do not read/write the user history
 
-TEST_SCRIPT="$(realpath ${0})"
-THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
+TEST_SCRIPT="$(realpath "${0}")"
+THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
 
 SESSION_FILE="${HOME}/.alienpy_session"
 SESSION_BACKUP="$(pwd)/alienpy_session_backup"

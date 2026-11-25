@@ -11,8 +11,8 @@ clean_logs
 
 export XRD_LOGLEVEL='Dump' XRD_LOGFILE=xrdlog.txt ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 export ALIENPY_NO_CWD_RESTORE=1 ALIENPY_NO_HISTORY=1
-TEST_SCRIPT="$(realpath ${0})"
-THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
+TEST_SCRIPT="$(realpath "${0}")"
+THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
 
 alien.py version 2>&1 | grep -q '^XRootD version: Not Found!' && { echo "XRootD python module not found, cp cannot work; skip ${THIS_TEST}"; exit 0; }
 

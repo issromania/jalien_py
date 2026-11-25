@@ -4,8 +4,8 @@ clean_logs () { rm -rf xrdlog_*.txt xrdlog.txt log.txt cmdout.txt ci_test_dir ou
 clean_logs
 
 export XRD_LOGLEVEL='Dump' XRD_LOGFILE=xrdlog.txt ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
-TEST_SCRIPT="$(realpath ${0})"
-THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
+TEST_SCRIPT="$(realpath "${0}")"
+THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
 
 ALIEN_HOME="$(ALIENPY_NO_CWD_RESTORE=yes alien.py home)"
 EXITCODE="${?}"

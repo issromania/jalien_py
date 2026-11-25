@@ -5,8 +5,8 @@ clean_logs () { rm -f log.txt cmdout.txt &> /dev/null; }
 clean_logs
 export ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 
-TEST_SCRIPT="$(realpath ${0})"
-THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
+TEST_SCRIPT="$(realpath "${0}")"
+THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
 
 GOOD_RESULT="4"
 EXITCODE="0"

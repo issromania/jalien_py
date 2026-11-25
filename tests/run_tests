@@ -5,14 +5,14 @@ shift
 
 [[ "${ARG}" == "ci-tests" ]] && IS_CI="1"
 
-SCRIPT_DIR="$(realpath --canonicalize-existing $( cd -- $( dirname -- ${BASH_SOURCE[0]} ) &> /dev/null && pwd ))"
+SCRIPT_DIR="$(realpath --canonicalize-existing "$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )")"
 
-test_dirlist=$(find "${SCRIPT_DIR}" -type d -name "*.test" | sort)
+mapfile -t test_dirlist < <(find "${SCRIPT_DIR}" -type d -name "*.test" | sort)  # one entry per line: paths with spaces
 
 FAILED_TESTS="0"
 
-for t in ${test_dirlist}; do
-    TEST_NAME="$(basename ${t})"
+for t in "${test_dirlist[@]}"; do
+    TEST_NAME="$(basename "${t}")"
     [[ -n "${IS_CI}" && "${TEST_NAME}" == "002_env_tokens.test" ]] && continue;
 
     echo "Running test : ${TEST_NAME} ... "

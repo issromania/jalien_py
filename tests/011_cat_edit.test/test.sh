@@ -10,8 +10,8 @@ clean_logs
 
 export XRD_LOGLEVEL='Dump' XRD_LOGFILE=xrdlog.txt ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 export ALIENPY_NO_CWD_RESTORE=1 ALIENPY_NO_HISTORY=1
-TEST_SCRIPT="$(realpath ${0})"
-THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
+TEST_SCRIPT="$(realpath "${0}")"
+THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
 
 alien.py version 2>&1 | grep -q '^XRootD version: Not Found!' && { echo "XRootD python module not found, cat/edit cannot work; skip ${THIS_TEST}"; exit 0; }
 
@@ -24,10 +24,14 @@ R="${ALIEN_HOME}alienpy_ci_cat_edit_${NOW}_$$"  # home already includes slash at
 L="ci_cat_edit"
 SPECS="@disk:2,ALICE::CERN::EOS"  # as in 005: 2 + CERN for the safety of the test
 F="${R}/edit.txt"
+EDITOR_APPEND=""
 LINE1="alienpy ci original line ${NOW}"
 LINE2="alienpy ci edited line ${NOW}"
 
-cleanup () { alien.py rm -rf "${R}" &> /dev/null || echo "WARNING: the test dir ${R} could not be removed, remove it by hand"; }
+cleanup () {
+alien.py rm -rf "${R}" &> /dev/null || echo "WARNING: the test dir ${R} could not be removed, remove it by hand"
+[[ -n "${EDITOR_APPEND}" ]] && rm -f "${EDITOR_APPEND}"
+}
 trap cleanup EXIT
 
 LAST_CMD=""
@@ -57,8 +61,9 @@ no_line () { grep -qxF "${2}" out.log && fail "${1}" "the output does not have t
 echo "Test dir: ${R}"
 mkdir -p "${L}"
 printf '%s\n' "${LINE1}" > "${L}/edit.txt"
-# non-interactive editors: the edit command runs "$EDITOR <temporary file>"
-EDITOR_APPEND="$(realpath "${L}")/editor_append.sh"
+# non-interactive editors: the edit command runs "$EDITOR <temporary file>", split as a shell command line,
+# so the editor script must be in a path without spaces (the test dir may have them): it is made in TMPDIR
+EDITOR_APPEND="$(mktemp "${TMPDIR:-/tmp}/alienpy_ci_editor_XXXXXX.sh")"
 printf '#!/usr/bin/env bash\nprintf "%%s\\n" "%s" >> "${1}"\n' "${LINE2}" > "${EDITOR_APPEND}"
 chmod +x "${EDITOR_APPEND}"
 
@@ -87,5 +92,6 @@ no_line "the backup does not have the appended line" "${LINE2}"
 
 expect_ok "rm -rf of the test dir" alien.py rm -rf "${R}"
 trap - EXIT
+rm -f "${EDITOR_APPEND}"
 clean_logs
 exit 0

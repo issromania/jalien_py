@@ -1907,7 +1907,7 @@ def ProcessInput(wb: WebSocketClientProtocol, cmd: str, args: Optional[list] = N
         ret_obj = dataclasses.replace(ret_obj, out = f"{ret_obj.out}\ntiming_ms = {ret_obj.ansdict['metadata']['timing_ms']}")
 
     if shellcmd and ret_obj.out:
-        shell_run = subprocess.run(shellcmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, input = f'{ret_obj.out}\n', encoding = 'ascii', shell = True)  # pylint: disable=subprocess-run-check # env=os.environ default is already the process env  # nosec
+        shell_run = subprocess.run(shellcmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, input = f'{ret_obj.out}\n', encoding = 'utf-8', errors = 'replace', shell = True)  # pylint: disable=subprocess-run-check # env=os.environ default is already the process env  # nosec
         return RET(exitcode = shell_run.returncode, out = shell_run.stdout, err = shell_run.stderr, ansdict = ret_obj.ansdict)
 
     return ret_obj

@@ -1,0 +1,64 @@
+# pylint configuration oriented to defects: errors, fatal problems and the warnings/refactor checks
+# that point to wrong behaviour (resource leaks, inconsistent returns, wrong exception handling, ...).
+# Style and layout checks (naming, line length, docstrings, complexity, formatting) are disabled.
+# usage: pylint alienpy/*.py   (the file is found in the current dir)
+# known false positives: possibly-used-before-assignment for async_stagger (wb_async) and
+# MyCopyProgressHandler (xrd_core), both defined/imported under the condition that guards their use
+
+[MAIN]
+py-version = 3.9
+jobs = 0
+# work in progress parts
+ignore = jboxpy
+persistent = no
+# defect oriented optional checkers
+load-plugins =
+    pylint.extensions.overlapping_exceptions,
+    pylint.extensions.eq_without_hash,
+    pylint.extensions.dict_init_mutate
+
+[MESSAGES CONTROL]
+# all errors (E), fatal (F) and warnings (W) are active, except the ones disabled below;
+# conventions (C) and refactor suggestions (R) are disabled, except the ones enabled below
+disable =
+    C,
+    R,
+    # broad except is used on purpose to report and continue (logged)
+    broad-exception-caught,
+    # module level state is set from functions on purpose
+    global-statement,
+    # f-strings in logging: formatting cost only; the debug calls are guarded by DEBUG
+    logging-fstring-interpolation,
+    # the command functions have a common signature (wb, args)
+    unused-argument,
+    # global_vars re-exports names to the other modules
+    unused-import,
+    # indentation/whitespace: layout
+    bad-indentation,
+    unnecessary-pass,
+    unnecessary-lambda,
+    # sys._getframe for the caller name in the debug log
+    protected-access,
+    # the examples use 'from alienpy.alien import *' (wildcard-import itself stays reported)
+    unused-wildcard-import
+
+enable =
+    # refactor checks that are defects or likely defects
+    inconsistent-return-statements,
+    consider-using-with,
+    comparison-with-itself,
+    comparison-of-constants,
+    stop-iteration-return,
+    # from the loaded extensions
+    overlapping-except,
+    eq-without-hash,
+    dict-init-mutate
+
+[TYPECHECK]
+# C extensions and optional modules: members are not visible to the static inference
+ignored-modules = XRootD, pyxrootd, gnureadline, readline, async_stagger
+# false positive of the inference for the socket enum
+generated-members = socket.AddressFamily.*
+
+[VARIABLES]
+dummy-variables-rgx = _+$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+?$)|dummy

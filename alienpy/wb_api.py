@@ -170,6 +170,7 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
 
     # NO MATTER WHAT BEFORE ANYTHING ELSE SESSION MUST BE INITIALIZED   !!!!!!!!!!!!!!!!
     if 'AlienSessionInfo' in globals():
+        is_reconnection = AlienSessionInfo['session_started']
         if not AlienSessionInfo['session_started']:  # this is beginning of session, let's get session vars ONLY ONCE
             AlienSessionInfo['session_started'] = True
             session_begin = time.perf_counter() if (TIME_CONNECT or DEBUG) else None
@@ -191,7 +192,8 @@ def InitConnection(wb: Optional[WebSocketClientProtocol] = None, token_args: Opt
         if cmdlist_func: cmdlist_func()
 
         # if this is a reconnection, make sure on the server we are in the last known current directory
-        if AlienSessionInfo['currentdir']: cd(wb, AlienSessionInfo['currentdir'], 'log nocheck')
+        # (at the beginning of the session currentdir comes from the server answer, so the cd would be a no-op round trip)
+        if is_reconnection and AlienSessionInfo['currentdir']: cd(wb, AlienSessionInfo['currentdir'], 'log nocheck')
 
         # if usercert connection always regenerate token if connected with usercert
         if gen_token and AlienSessionInfo['use_usercert'] and token(wb, token_args) != 0:

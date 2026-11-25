@@ -28,4 +28,4 @@ echo "Trying stat of invalid directory .."
 alien.py "stat /fail/no/valid" &>> output.txt && { REZ="${?}"; echo "stat invalid dir:: expected exitcode !=0 but got ${REZ}"; exit 1; }
 
 clean_logs
-
+exit 0

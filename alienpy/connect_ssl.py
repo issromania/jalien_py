@@ -2,10 +2,12 @@
 
 import datetime
 import functools
+import getpass
 import sys
 import os
 import logging
 import uuid
+from typing import Callable
 import tempfile
 import ssl
 
@@ -260,6 +262,20 @@ def cert_key_load_reason(e: Exception, cert: str, key: str) -> str:
     return f'no problem found in the files, OpenSSL error is: {type(e).__name__}: {e}'
 
 
+def key_passphrase_prompt(key: str) -> Callable[[], bytes]:
+    """Password callback for load_cert_chain (called only for an encrypted key): prompt on the terminal, as OpenSSL does when no callback is given.
+    Python 3.15 always installs its own callback, so without this the encrypted key fails to load without any prompt.
+    Without a terminal the passphrase is empty (the load fails, as with the OpenSSL prompt); stdin is never read."""
+    def _prompt() -> bytes:
+        if os.name != 'nt':  # getpass falls back to stdin when there is no terminal: check that the terminal is available
+            try:
+                with open('/dev/tty', 'rb'): pass
+            except OSError:
+                return b''
+        return getpass.getpass(f'Enter PEM pass phrase for {key}: ').encode()
+    return _prompt
+
+
 def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key: str = '', token_cert: str = '', token_key: str = '') -> ssl.SSLContext:
     """Create SSL context using either the default names for user certificate and token certificate or X509_USER_{CERT,KEY} JALIEN_TOKEN_{CERT,KEY} environment variables"""
     use_token = not (use_usercert or not token_cert)
@@ -300,7 +316,7 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
 
     if DEBUG: logging.debug('SSL context:: Loading cert,key pair:\n%s\n%s', cert, key)
     try:
-        ctx.load_cert_chain(certfile = cert, keyfile = key)
+        ctx.load_cert_chain(certfile = cert, keyfile = key, password = key_passphrase_prompt(key))
     except Exception as e:
         reason = cert_key_load_reason(e, cert, key)
         logging.exception("SSL context:: Could not load cert/key pair:\nCert: %s\nKey: %s\nReason: %s", cert, key, reason, stack_info = True)

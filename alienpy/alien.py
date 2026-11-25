@@ -15,6 +15,7 @@ import dataclasses
 import collections
 import datetime
 import difflib
+import functools
 import hashlib
 import json
 import math
@@ -29,15 +30,18 @@ from typing import Optional, Union
 import time
 from urllib.parse import urlparse
 
-# External imports
-try:
-    import requests
-except Exception:
-    print("requests module could not be imported! Make sure you can do:\npython3 -c 'import requests'", file = sys.stderr, flush = True)
-    sys.exit(1)
 
-# one session for the http(s) requests (CCDB queries and downloads): the connections to a server are kept and reused
-HTTP_SESSION = requests.Session()
+@functools.lru_cache(maxsize = None)
+def http_session():
+    """One session for the http(s) requests (CCDB queries and downloads): the connections to a server are kept and reused.
+    requests is imported at the first use (about 50 ms), not at the start of every command"""
+    try:
+        import requests  # pylint: disable=import-outside-toplevel
+    except Exception:
+        print("requests module could not be imported! Make sure you can do:\npython3 -c 'import requests'", file = sys.stderr, flush = True)
+        sys.exit(1)
+    return requests.Session()
+
 
 # For type hinting
 from websockets import ClientConnection as WebSocketClientProtocol  # noqa: TC002
@@ -682,7 +686,7 @@ def ccdb_runinfo(run: str = '', ccdb: str = 'http://alice-ccdb.cern.ch/', ssl_ar
     if ssl_args is None: ssl_args = {}
     headers = { 'User-Agent': USER_AGENT_HTTP, 'Accept': 'application/json', 'Accept-encoding': 'gzip, deflate', 'Browse-Limit': '99'}
     try:
-        ccdb_query = HTTP_SESSION.get(f'{ccdb}latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5, **ssl_args)
+        ccdb_query = http_session().get(f'{ccdb}latest/RCT/Info/RunInformation/{run}', headers = headers, timeout = 5, **ssl_args)
         if ccdb_query.status_code != 200: return {}
         return ccdb_query.json()
     except Exception:
@@ -701,7 +705,7 @@ def ccdb_http_download(src: str, dst: str, size: Union[str, int, None] = None, m
     dst_tmp = f'{dst}.part'
     hasher = hashlib.md5(usedforsecurity = False)
     try:
-        with HTTP_SESSION.get(src, headers = {'User-Agent': USER_AGENT_HTTP}, timeout = timeout, stream = True, **ssl_args) as response:
+        with http_session().get(src, headers = {'User-Agent': USER_AGENT_HTTP}, timeout = timeout, stream = True, **ssl_args) as response:
             if response.status_code != 200: return RET(1, '', f'HTTP code {response.status_code} for {src}')
             Path(os.path.dirname(dst)).mkdir(parents = True, exist_ok = True)
             with open(dst_tmp, mode = 'wb') as f:
@@ -867,7 +871,7 @@ task name / detector name / [ / time [ / key = value]* ]
         headers[k.strip()] = v.strip()
 
     try:
-        ccdb_query = HTTP_SESSION.get(f'{ccdb}{listing_type}{query_str}', headers = headers, timeout = 5, **requests_ssl_args)
+        ccdb_query = http_session().get(f'{ccdb}{listing_type}{query_str}', headers = headers, timeout = 5, **requests_ssl_args)
         if ccdb_query.status_code != 200:
             return RET(1, '', f'Invalid answer (code {ccdb_query.status_code}) from query:\n{ccdb}{listing_type}{query_str}')
         q_dict = ccdb_query.json()

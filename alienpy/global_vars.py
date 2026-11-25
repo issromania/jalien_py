@@ -3,7 +3,6 @@
 import os
 import platform
 import re
-import requests
 import sys
 import socket
 from socket import gethostname
@@ -94,7 +93,7 @@ except Exception:
 
 PYTHON_VERSION = f'{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}'
 USER_AGENT = f'alienpy/{ALIENPY_VERSION_STR} websockets/{wb_version} Python/{PYTHON_VERSION} platform/{PLATFORM_ID} id/{USER}@{HOSTNAME}'
-USER_AGENT_HTTP = f'alienpy/{ALIENPY_VERSION_STR} requests/{requests.__version__} Python/{PYTHON_VERSION} platform/{PLATFORM_ID} id/{USER}@{HOSTNAME} session/{session_id}'
+USER_AGENT_HTTP = f'alienpy/{ALIENPY_VERSION_STR} requests/{_meta_version("requests")} Python/{PYTHON_VERSION} platform/{PLATFORM_ID} id/{USER}@{HOSTNAME} session/{session_id}'
 
 if I_AM_GRID_JOB:
     USER_AGENT = f'{USER_AGENT} jobid/{ALIEN_JOB_ID}'

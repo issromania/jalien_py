@@ -13,74 +13,103 @@ export ALIENPY_NO_HISTORY=1 ALIENPY_NO_CWD_RESTORE=1  # do not read/write the us
 TEST_SCRIPT="$(realpath ${0})"
 THIS_TEST="$(basename $(dirname ${TEST_SCRIPT}))/$(basename ${TEST_SCRIPT})"
 
-fail () { echo "FAIL in ${THIS_TEST} :: ${1}"; cat out.log; exit 1; }
+LAST_CMD=""
+RC=""
+# trying <check> : print the check that is done
+trying () { echo "Trying ${1} .."; }
 
-# run_rc <command...> : run with output in out.log, set RC
-run_rc () { "$@" &> out.log; RC="${?}"; }
+# fail <check> <expected> : report the check, the command run, what was expected, what was got
+fail () {
+echo "FAIL in ${THIS_TEST}"
+echo "  check    : ${1}"
+echo "  command  : ${LAST_CMD}"
+echo "  expected : ${2}"
+echo "  exitcode : ${RC}"
+echo "  output   :"
+sed 's/^/    | /' out.log
+exit 1
+}
+
+# run_rc <command...> : run with output in out.log, set RC; the command is kept for the failure report
+run_rc () { LAST_CMD="$*"; "$@" &> out.log; RC="${?}"; }
+
+# run_shell <printf format> [args] : run the alien.py shell with these commands on stdin
+run_shell () { local input; input="$(printf "$@")"; LAST_CMD="alien.py (shell) with input: ${input//$'\n'/ ; }"; alien.py < <(printf '%s\n' "${input}") &> out.log; RC="${?}"; }
 
 ALIEN_HOME="$(alien.py home)"
 EXITCODE="${?}"
 [[ -z "${ALIEN_HOME}" ]] && { echo "Could not get ALIEN_HOME in ${THIS_TEST}"; exit "${EXITCODE}"; }
 INVALID_DIR="/alice/cern.ch/alienpy_ci_does_not_exist_$(date +%s)"
 
+trying "ls of a dir that does not exist (must fail)"
 run_rc alien.py ls "${INVALID_DIR}"
 LS_FAIL_RC="${RC}"
-[[ "${LS_FAIL_RC}" != "0" ]] || fail "ls of invalid dir: expected exitcode != 0"
+[[ "${LS_FAIL_RC}" != "0" ]] || fail "ls of a dir that does not exist" "exitcode != 0"
 
 # chain: the exitcode is the one of the last command
+trying "chain 'failing ls; pwd': exitcode of the last command (0)"
 run_rc alien.py "ls ${INVALID_DIR}; pwd"
-[[ "${RC}" == "0" ]] || fail "chain with last command valid: expected exitcode 0 got ${RC}"
-grep -qxF "${ALIEN_HOME}" out.log || fail "chain: pwd output (${ALIEN_HOME}) not found"
+[[ "${RC}" == "0" ]] || fail "chain with the last command valid" "exitcode 0"
+grep -qxF "${ALIEN_HOME}" out.log || fail "chain with the last command valid" "the pwd output >${ALIEN_HOME}<"
 
+trying "chain 'pwd; failing ls': exitcode of the last command (${LS_FAIL_RC})"
 run_rc alien.py "pwd; ls ${INVALID_DIR}"
-[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "chain with last command failed: expected exitcode ${LS_FAIL_RC} got ${RC}"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "chain with the last command failed" "exitcode ${LS_FAIL_RC} (of the failing ls)"
 
 # pipe of the output to a shell command; the exitcode is the one of the shell command
+trying "pipe of pwd to 'grep -c alice': output 1, exitcode 0"
 run_rc alien.py "pwd | grep -c alice"
-[[ "${RC}" == "0" && "$(< out.log)" == "1" ]] || fail "pipe to grep -c : expected exitcode 0 and output 1, got ${RC}"
+[[ "${RC}" == "0" && "$(< out.log)" == "1" ]] || fail "pipe of the output to a shell command" "exitcode 0 and the output 1"
 
+trying "pipe of pwd to grep without match: exitcode 1 of grep"
 run_rc alien.py "pwd | grep -q alienpy_ci_no_such_string"
-[[ "${RC}" == "1" ]] || fail "pipe to grep without match: expected exitcode 1 got ${RC}"
+[[ "${RC}" == "1" ]] || fail "pipe to a shell command that fails" "exitcode 1 (of grep)"
 
 # batch file: one command per line, the exitcode is the one of the last command
 printf 'ls %s\npwd\n' "${INVALID_DIR}" > cmds_ok.txt
 printf 'pwd\nls %s\n' "${INVALID_DIR}" > cmds_fail.txt
+trying "batch file 'failing ls, pwd': exitcode of the last command (0)"
 run_rc alien.py ./cmds_ok.txt
-[[ "${RC}" == "0" ]] || fail "batch file with last command valid: expected exitcode 0 got ${RC}"
-grep -qxF "${ALIEN_HOME}" out.log || fail "batch file: pwd output not found"
+[[ "${RC}" == "0" ]] || fail "batch file with the last command valid" "exitcode 0"
+grep -qxF "${ALIEN_HOME}" out.log || fail "batch file with the last command valid" "the pwd output >${ALIEN_HOME}<"
+
+trying "batch file 'pwd, failing ls': exitcode of the last command (${LS_FAIL_RC})"
 run_rc alien.py ./cmds_fail.txt
-[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "batch file with last command failed: expected exitcode ${LS_FAIL_RC} got ${RC}"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "batch file with the last command failed" "exitcode ${LS_FAIL_RC} (of the failing ls)"
 
 # unknown command is refused client side
+trying "unknown command: refused with exitcode 1"
 run_rc alien.py alienpy_ci_no_such_command
-[[ "${RC}" == "1" ]] || fail "unknown command: expected exitcode 1 got ${RC}"
+[[ "${RC}" == "1" ]] || fail "unknown command" "exitcode 1"
 
-# exit command with explicit code
+trying "exit 3 in command mode: exitcode 3"
 run_rc alien.py "exit 3"
-[[ "${RC}" == "3" ]] || fail "exit 3 in command mode: expected exitcode 3 got ${RC}"
+[[ "${RC}" == "3" ]] || fail "exit with explicit code in command mode" "exitcode 3"
 
-# a bare exit before any other command
+trying "bare exit in command mode: exitcode 0"
 run_rc alien.py exit
-[[ "${RC}" == "0" ]] || fail "bare exit in command mode: expected exitcode 0 got ${RC}"
+[[ "${RC}" == "0" ]] || fail "bare exit before any other command" "exitcode 0"
 
 # -json : the output is the JSON answer of the server
+trying "-json pwd: the output is the JSON answer of the server"
 run_rc alien.py -json pwd
-[[ "${RC}" == "0" ]] || fail "-json pwd: expected exitcode 0 got ${RC}"
-python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); sys.exit(0 if "metadata" in d and "results" in d else 1)' out.log || fail "-json pwd: output is not a JSON server answer"
+[[ "${RC}" == "0" ]] || fail "-json pwd" "exitcode 0"
+python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); sys.exit(0 if "metadata" in d and "results" in d else 1)' out.log || fail "-json pwd" "a JSON object with metadata and results"
 
 # shell mode with commands from stdin: failed and invalid commands do not terminate the shell
 # (the prompt contains the current dir, so the pwd output is marked to be found)
-run_rc alien.py < <(printf 'ls %s\nls "unbalanced_quote\npwd | sed s/^/MARK_/\nexit 7\n' "${INVALID_DIR}")
-[[ "${RC}" == "7" ]] || fail "shell: expected exitcode 7 (from exit 7) got ${RC}"
-grep -qF "MARK_${ALIEN_HOME}" out.log || fail "shell: pwd output after the failed commands not found"
+trying "shell: failing ls and invalid quoting do not stop it, then exit 7"
+run_shell 'ls %s\nls "unbalanced_quote\npwd | sed s/^/MARK_/\nexit 7' "${INVALID_DIR}"
+[[ "${RC}" == "7" ]] || fail "shell continues after failed commands and exits with exit 7" "exitcode 7"
+grep -qF "MARK_${ALIEN_HOME}" out.log || fail "shell continues after failed commands" "the pwd output marked MARK_${ALIEN_HOME}"
 
-# shell mode: a bare exit as the first command
-run_rc alien.py < <(printf 'exit\n')
-[[ "${RC}" == "0" ]] || fail "shell: bare exit as first command: expected exitcode 0 got ${RC}"
+trying "shell: bare exit as the first command: exitcode 0"
+run_shell 'exit'
+[[ "${RC}" == "0" ]] || fail "shell: bare exit as the first command" "exitcode 0"
 
-# shell mode: exit without code returns the exitcode of the last command
-run_rc alien.py < <(printf 'ls %s\nexit\n' "${INVALID_DIR}")
-[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "shell: exit after failed command: expected exitcode ${LS_FAIL_RC} got ${RC}"
+trying "shell: bare exit after a failing ls: exitcode of the ls (${LS_FAIL_RC})"
+run_shell 'ls %s\nexit' "${INVALID_DIR}"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "shell: bare exit after a failed command" "exitcode ${LS_FAIL_RC} (of the failing ls)"
 
 clean_logs
 exit 0

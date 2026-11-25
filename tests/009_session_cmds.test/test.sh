@@ -21,7 +21,9 @@ rm -f "${SESSION_BACKUP}" &> /dev/null
 
 TESTDIR_REMOTE=""
 cleanup () {
-[[ -n "${TESTDIR_REMOTE}" ]] && ALIENPY_NO_CWD_RESTORE=1 alien.py rm -rf "${TESTDIR_REMOTE}" &> /dev/null  # does not matter if missing
+if [[ -n "${TESTDIR_REMOTE}" ]]; then  # left by a failed check
+    ALIENPY_NO_CWD_RESTORE=1 alien.py rm -rf "${TESTDIR_REMOTE}" &> /dev/null || echo "WARNING: the test dir ${TESTDIR_REMOTE} could not be removed, remove it by hand"
+fi
 if [[ -f "${SESSION_BACKUP}" ]]; then
     mv -f "${SESSION_BACKUP}" "${SESSION_FILE}"
 else
@@ -36,10 +38,10 @@ fail () { echo "FAIL in ${THIS_TEST} :: ${1}"; cat out.log; exit 1; }
 run_rc () { "$@" &> out.log; RC="${?}"; }
 
 # expect_ok <description> <command...>
-expect_ok () { local desc="${1}"; shift; run_rc "$@"; [[ "${RC}" == "0" ]] || fail "${desc}: expected exitcode 0 got ${RC}"; }
+expect_ok () { local desc="${1}"; shift; echo "Trying ${desc} .."; run_rc "$@"; [[ "${RC}" == "0" ]] || fail "${desc}: expected exitcode 0 got ${RC}"; }
 
 # expect_fail <description> <command...>
-expect_fail () { local desc="${1}"; shift; run_rc "$@"; [[ "${RC}" != "0" ]] || fail "${desc}: expected exitcode != 0 got 0"; }
+expect_fail () { local desc="${1}"; shift; echo "Trying ${desc} (must fail) .."; run_rc "$@"; [[ "${RC}" != "0" ]] || fail "${desc}: expected exitcode != 0 got 0"; }
 
 # expect_line <description> <line> : out.log has the exact line
 expect_line () { grep -qxF "${2}" out.log || fail "${1}: line >${2}< not found"; }
@@ -93,6 +95,7 @@ expect_fail "stat of removed file" alien.py stat "${R}/a/f.txt"
 # the last cd of a command is saved and restored by the next shell
 expect_ok "cd for session save" alien.py "cd ${R}/a/b2"
 grep -qxF "CWD = ${R}/a/b2/" "${SESSION_FILE}" || { cp "${SESSION_FILE}" out.log; fail "session file does not have the cwd ${R}/a/b2/"; }
+echo "Trying cwd restore by the shell .."
 run_rc env -u ALIENPY_NO_CWD_RESTORE alien.py < <(printf 'pwd | sed s/^/RESTORED_/\nexit\n')
 [[ "${RC}" == "0" ]] || fail "shell with restore: expected exitcode 0 got ${RC}"
 grep -qF "RESTORED_${R}/a/b2/" out.log || fail "shell did not restore the cwd ${R}/a/b2/"

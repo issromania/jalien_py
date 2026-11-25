@@ -32,19 +32,31 @@ fi
 }
 trap cleanup EXIT
 
-fail () { echo "FAIL in ${THIS_TEST} :: ${1}"; cat out.log; exit 1; }
+LAST_CMD=""
+RC=""
+# fail <check> <expected> : report the check, the command run, what was expected, what was got
+fail () {
+echo "FAIL in ${THIS_TEST}"
+echo "  check    : ${1}"
+echo "  command  : ${LAST_CMD}"
+echo "  expected : ${2}"
+echo "  exitcode : ${RC}"
+echo "  output   :"
+sed 's/^/    | /' out.log
+exit 1
+}
 
-# run_rc <command...> : run with output in out.log, set RC
-run_rc () { "$@" &> out.log; RC="${?}"; }
+# run_rc <command...> : run with output in out.log, set RC; the command is kept for the failure report
+run_rc () { LAST_CMD="$*"; "$@" &> out.log; RC="${?}"; }
 
-# expect_ok <description> <command...>
-expect_ok () { local desc="${1}"; shift; echo "Trying ${desc} .."; run_rc "$@"; [[ "${RC}" == "0" ]] || fail "${desc}: expected exitcode 0 got ${RC}"; }
+# expect_ok <check> <command...>
+expect_ok () { local desc="${1}"; shift; echo "Trying ${desc} .."; run_rc "$@"; [[ "${RC}" == "0" ]] || fail "${desc}" "exitcode 0"; }
 
-# expect_fail <description> <command...>
-expect_fail () { local desc="${1}"; shift; echo "Trying ${desc} (must fail) .."; run_rc "$@"; [[ "${RC}" != "0" ]] || fail "${desc}: expected exitcode != 0 got 0"; }
+# expect_fail <check> <command...>
+expect_fail () { local desc="${1}"; shift; echo "Trying ${desc} .."; run_rc "$@"; [[ "${RC}" != "0" ]] || fail "${desc}" "exitcode != 0"; }
 
-# expect_line <description> <line> : out.log has the exact line
-expect_line () { grep -qxF "${2}" out.log || fail "${1}: line >${2}< not found"; }
+# expect_line <check> <line> : the output of the last command has the exact line
+expect_line () { grep -qxF "${2}" out.log || fail "${1}" "the output has the line >${2}<"; }
 
 export ALIENPY_NO_CWD_RESTORE=1  # command mode starts in the home dir; restore is checked explicitly at the end
 
@@ -54,54 +66,56 @@ EXITCODE="${?}"
 
 TESTDIR_REMOTE="${ALIEN_HOME}alienpy_ci_session_$(date +%Y%m%d_%H%M%S)_$$"  # home already includes slash at the end
 R="${TESTDIR_REMOTE}"
+echo "Test dir: ${R}"
 
-expect_ok "mkdir -p" alien.py mkdir -p "${R}/a/b"
-expect_ok "stat of created dir" alien.py stat "${R}/a/b"
+expect_ok "mkdir -p creates a/b in the test dir" alien.py mkdir -p "${R}/a/b"
+expect_ok "stat of the dir created by mkdir -p" alien.py stat "${R}/a/b"
 
-expect_ok "cd absolute" alien.py "cd ${R}/a/b; pwd"
-expect_line "cd absolute" "${R}/a/b/"
+expect_ok "cd to an absolute path, then pwd" alien.py "cd ${R}/a/b; pwd"
+expect_line "pwd after cd to an absolute path" "${R}/a/b/"
 
-expect_ok "cd relative" alien.py "cd ${R}; cd a; pwd"
-expect_line "cd relative" "${R}/a/"
+expect_ok "cd to a relative path, then pwd" alien.py "cd ${R}; cd a; pwd"
+expect_line "pwd after cd to a relative path" "${R}/a/"
 
-expect_ok "cd -" alien.py "cd ${R}/a; cd b; cd -; pwd"
-expect_line "cd -" "${R}/a/"
+expect_ok "cd - goes back to the previous dir, then pwd" alien.py "cd ${R}/a; cd b; cd -; pwd"
+expect_line "pwd after cd -" "${R}/a/"
 
-expect_ok "cd .." alien.py "cd ${R}/a/b; cd ..; pwd"
-expect_line "cd .." "${R}/a/"
+expect_ok "cd .. goes to the parent dir, then pwd" alien.py "cd ${R}/a/b; cd ..; pwd"
+expect_line "pwd after cd .." "${R}/a/"
 
-expect_ok "cd without argument" alien.py "cd ${R}/a; cd; pwd"
-expect_line "cd without argument" "${ALIEN_HOME}"
+expect_ok "cd without argument goes home, then pwd" alien.py "cd ${R}/a; cd; pwd"
+expect_line "pwd after cd without argument" "${ALIEN_HOME}"
 
-expect_ok "pushd/popd" alien.py "cd ${R}; pushd ${R}/a/b; pwd | sed s/^/PUSHD_/; popd; pwd | sed s/^/POPD_/"
-expect_line "pushd" "PUSHD_${R}/a/b/"
-expect_line "popd" "POPD_${R}/"
+expect_ok "pushd a/b then popd, with pwd after each" alien.py "cd ${R}; pushd ${R}/a/b; pwd | sed s/^/PUSHD_/; popd; pwd | sed s/^/POPD_/"
+expect_line "pwd after pushd (marked PUSHD_)" "PUSHD_${R}/a/b/"
+expect_line "pwd after popd (marked POPD_)" "POPD_${R}/"
 
-expect_ok "mkdir relative" alien.py "cd ${R}; mkdir c"
-expect_ok "stat of relative mkdir" alien.py stat "${R}/c"
+expect_ok "mkdir with a relative path (c)" alien.py "cd ${R}; mkdir c"
+expect_ok "stat of the dir created with a relative path" alien.py stat "${R}/c"
 
-expect_ok "touch" alien.py touch "${R}/a/f.txt"
-expect_ok "ls" alien.py ls "${R}/a"
-expect_line "ls file" "f.txt"
-expect_line "ls dir" "b/"
+expect_ok "touch creates the empty file a/f.txt" alien.py touch "${R}/a/f.txt"
+expect_ok "ls of dir a" alien.py ls "${R}/a"
+expect_line "ls of dir a lists the file created by touch" "f.txt"
+expect_line "ls of dir a lists the subdir b (with / added by ls -F)" "b/"
 
-expect_ok "mv dir" alien.py mv "${R}/a/b" "${R}/a/b2"
-expect_ok "stat of moved dir" alien.py stat "${R}/a/b2"
-expect_fail "stat of mv source" alien.py stat "${R}/a/b"
+expect_ok "mv of dir a/b to a/b2" alien.py mv "${R}/a/b" "${R}/a/b2"
+expect_ok "stat of the mv destination" alien.py stat "${R}/a/b2"
+expect_fail "stat of the mv source (must fail)" alien.py stat "${R}/a/b"
 
-expect_ok "rm file" alien.py rm "${R}/a/f.txt"
-expect_fail "stat of removed file" alien.py stat "${R}/a/f.txt"
+expect_ok "rm of the file a/f.txt" alien.py rm "${R}/a/f.txt"
+expect_fail "stat of the removed file (must fail)" alien.py stat "${R}/a/f.txt"
 
 # the last cd of a command is saved and restored by the next shell
-expect_ok "cd for session save" alien.py "cd ${R}/a/b2"
-grep -qxF "CWD = ${R}/a/b2/" "${SESSION_FILE}" || { cp "${SESSION_FILE}" out.log; fail "session file does not have the cwd ${R}/a/b2/"; }
-echo "Trying cwd restore by the shell .."
+expect_ok "cd to a/b2 (saved in ${SESSION_FILE})" alien.py "cd ${R}/a/b2"
+grep -qxF "CWD = ${R}/a/b2/" "${SESSION_FILE}" || { cp "${SESSION_FILE}" out.log; LAST_CMD="cat ${SESSION_FILE}"; fail "the cwd is saved in the session file" "the line >CWD = ${R}/a/b2/<"; }
+echo "Trying the shell restores the saved cwd .."
 run_rc env -u ALIENPY_NO_CWD_RESTORE alien.py < <(printf 'pwd | sed s/^/RESTORED_/\nexit\n')
-[[ "${RC}" == "0" ]] || fail "shell with restore: expected exitcode 0 got ${RC}"
-grep -qF "RESTORED_${R}/a/b2/" out.log || fail "shell did not restore the cwd ${R}/a/b2/"
+LAST_CMD="${LAST_CMD} (shell, input: pwd | sed s/^/RESTORED_/ ; exit)"
+[[ "${RC}" == "0" ]] || fail "the shell restores the saved cwd" "exitcode 0"
+grep -qF "RESTORED_${R}/a/b2/" out.log || fail "the shell restores the saved cwd" "the pwd output (marked RESTORED_) is ${R}/a/b2/"
 
-expect_ok "rm -rf" alien.py rm -rf "${R}"
-expect_fail "stat of removed dir" alien.py stat "${R}"
+expect_ok "rm -rf of the test dir" alien.py rm -rf "${R}"
+expect_fail "stat of the removed test dir (must fail)" alien.py stat "${R}"
 TESTDIR_REMOTE=""
 
 clean_logs

@@ -2159,7 +2159,7 @@ def main() -> None:
     # batch mode: the only argument is an existing file given as a path (containing / or .)
     # a bare word (e.g. ls) is always a command, even if a local file with that name exists; use ./name for such a batch file
     if len(sys.argv) == 1 and ('/' in sys.argv[0] or '.' in sys.argv[0]) and os.path.isfile(sys.argv[0]):
-        with open(sys.argv[0], encoding="ascii", errors="replace") as input_file:
+        with open(sys.argv[0], encoding="utf-8", errors="replace") as input_file:  # commands can have non-ascii local paths
             arg_list = input_file.read().strip().replace('\n',';')
     else:
         arg_list = sys.argv

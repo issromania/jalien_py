@@ -58,7 +58,7 @@ from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
 from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
-from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, CA_PATH
+from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
@@ -818,7 +818,7 @@ task name / detector name / [ / time [ / key = value]* ]
     cert, key = AlienSessionInfo['token_cert'], AlienSessionInfo['token_key']
     requests_ssl_args = {}
     if ccdb.startswith('https://'):
-        requests_ssl_args = { 'cert': (cert, key), 'verify': CA_PATH }
+        requests_ssl_args = { 'cert': (cert, key), 'verify': ca_path() }
 
     query_str = args[0]  # after removal of args assume the rest is the query
     query_str = query_str.replace('.*', '').replace('*', '')

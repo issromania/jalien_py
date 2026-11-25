@@ -1,6 +1,7 @@
 """alienpy:: SSL and certificate tooling"""
 
 import datetime
+import functools
 import sys
 import os
 import logging
@@ -110,6 +111,12 @@ def get_ca_path() -> str:
     os.environ['X509_CERT_DIR'] = capath_default
     logging.debug('CApath:: found and set to %s', capath_default)
     return capath_default
+
+
+@functools.lru_cache(maxsize = None)
+def ca_path() -> str:
+    """CA location, looked up at the first use (connection or certificate verification), so that the commands without connection (e.g. getCAcerts) do not report missing CAs"""
+    return get_ca_path()
 
 
 def cert_invalid_reason(fname: str) -> str:
@@ -267,10 +274,10 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
         raise SSLctxException(f'no valid {cred_type} found to be used for SSL context; check the previous messages in {DEBUG_FILE}')
 
     cafile = capath = None
-    if os.path.isfile(CA_PATH):
-        cafile = CA_PATH
+    if os.path.isfile(ca_path()):
+        cafile = ca_path()
     else:
-        capath = CA_PATH
+        capath = ca_path()
 
     if DEBUG: logging.debug('\nCert = %s\nKey = %s\nCreating SSL context .. ', cert, key)
 
@@ -282,12 +289,12 @@ def create_ssl_context(use_usercert: bool = False, user_cert: str = '', user_key
     # INTENTIONAL: the server certificate is verified against the CAs only for usercert connections, not for token connections
     if not use_token:
         ctx.verify_mode = ssl.CERT_REQUIRED  # CERT_NONE, CERT_OPTIONAL, CERT_REQUIRED
-        logging.info('SSL context:: Loading verify location:\n%s', CA_PATH)
+        logging.info('SSL context:: Loading verify location:\n%s', ca_path())
         try:
             ctx.load_verify_locations(cafile = cafile, capath = capath)
         except Exception as e:
-           logging.exception("SSL context:: Could not load verify location %s", CA_PATH, stack_info = True)
-           raise SSLctxException(f'CA verify location could not be loaded, check content of >>> {CA_PATH} <<< : {type(e).__name__}: {e}') from e
+           logging.exception("SSL context:: Could not load verify location %s", ca_path(), stack_info = True)
+           raise SSLctxException(f'CA verify location could not be loaded, check content of >>> {ca_path()} <<< : {type(e).__name__}: {e}') from e
     else:
         ctx.verify_mode = ssl.CERT_NONE  # INTENTIONAL for token connections (JAliEn central services and JBox proxy particularities)
 
@@ -308,7 +315,7 @@ def tls_cert_error_msg(e: BaseException, cert: str = '') -> str:
     """Return an explanation if the TLS connection failure e is caused by a certificate, empty string otherwise"""
     if isinstance(e, ssl.SSLCertVerificationError):
         return (f'The server certificate could not be verified: {e.verify_message}\n'
-                f'Check the CA certificates (and their hash links) used for verification: {CA_PATH}\n'
+                f'Check the CA certificates (and their hash links) used for verification: {ca_path()}\n'
                 'Either set X509_CERT_DIR to a directory with up-to-date IGTF CAs or run "alien.py getCAcerts" and set ALIENPY_USE_LOCAL_CAS=1')
     reason = str(getattr(e, 'reason', None) or '') if isinstance(e, ssl.SSLError) else ''
     if '_ALERT_' in reason and ('CERTIFICATE' in reason or reason.endswith('UNKNOWN_CA') or reason.endswith('ACCESS_DENIED')):
@@ -387,7 +394,7 @@ def CertInfo(fname: str) -> RET:
 
 
 def CertVerify(fname: str) -> RET:
-    """Verify the certificate against the CA location in use (CA_PATH)"""
+    """Verify the certificate against the CA location in use (ca_path())"""
     cert_bytes = None
     try:
         with open(fname, "rb") as f: cert_bytes = f.read()
@@ -410,16 +417,16 @@ def CertVerify(fname: str) -> RET:
     x509store.set_flags(OpenSSL.crypto.X509StoreFlags.ALLOW_PROXY_CERTS)
 
     cafile = capath = None
-    if os.path.isfile(CA_PATH):
-        cafile = CA_PATH
+    if os.path.isfile(ca_path()):
+        cafile = ca_path()
     else:
-        capath = CA_PATH
+        capath = ca_path()
 
     try:
         x509store.load_locations(cafile = cafile, capath = capath)
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(5, '', f'Could not load verify location >>> {CA_PATH} <<< : {e}')  # EIO /* I/O error */
+        return RET(5, '', f'Could not load verify location >>> {ca_path()} <<< : {e}')  # EIO /* I/O error */
 
     store_ctx = OpenSSL.crypto.X509StoreContext(x509store, x509cert)
     try:
@@ -427,7 +434,7 @@ def CertVerify(fname: str) -> RET:
         return RET(0, f'SSL Verification {PrintColor(COLORS.BIGreen)}successful{PrintColor(COLORS.ColorReset)} for {fname}')
     except Exception as e:
         if DEBUG: logging.exception(e)
-        return RET(1, '', f'SSL Verification {PrintColor(COLORS.BIRed)}failed{PrintColor(COLORS.ColorReset)} for {fname} : {e} (CA location: {CA_PATH})')
+        return RET(1, '', f'SSL Verification {PrintColor(COLORS.BIRed)}failed{PrintColor(COLORS.ColorReset)} for {fname} : {e} (CA location: {ca_path()})')
 
 
 def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
@@ -462,9 +469,6 @@ def CertKeyMatch(cert_fname: str, key_fname: str) -> RET:
         if DEBUG: logging.exception(e)
         return RET(1, '', 'Cert/key match :: unknown error')
 
-
-# HAVE A GLOBAL CA_PATH
-CA_PATH = get_ca_path()
 
 # Populate information in AlienSessionInfo
 _ = renewCredFilesInfo()

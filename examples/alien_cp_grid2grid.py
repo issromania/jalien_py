@@ -11,6 +11,7 @@ import shutil
 
 try:
     from alienpy import alien
+    from alienpy.xrd_tools import pathtype_grid
 except Exception:
     print("Can't load alienpy, exiting...")
     sys.exit(1)
@@ -55,7 +56,7 @@ alien.retf_print(download_results)
 # Stage2 - upload
 upload_args = arg_list_expanded.copy()
 src_lfn = alien.specs_split.split(SRC_ARG, maxsplit = 1)[0]
-if alien.pathtype_grid(wb,src_lfn) == 'f':
+if pathtype_grid(wb, src_lfn) == 'f':
     local_arg = f'{local_arg}{os.path.basename(src_lfn)}'
 upload_args.append(local_arg)
 upload_args.append(DST_ARG)

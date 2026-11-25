@@ -24,8 +24,8 @@ if sys.version_info[1] < 7:
 else:
     base_requirements.append('websockets >= 15.0.0')
 
-if sys.platform == 'darwin':
-    base_requirements.append('gnureadline')
+# environment marker: evaluated at install time; a platform test here would be evaluated where the wheel is built (py3-none-any wheel made on Linux)
+base_requirements.append('gnureadline; sys_platform == "darwin"')
 
 # ALICE have XRootD built in a separate recipe
 selected_requirements = base_requirements

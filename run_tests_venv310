@@ -8,7 +8,7 @@ python3.10 -m venv "${VENV_DIR}" || { echo "error"; exit 1; }
 
 source "${VENV_DIR}/bin/activate"
 pip install --no-cache-dir --upgrade pip
-pip install --no-cache-dir --upgrade setuptools[core] wheel distutils
+pip install --no-cache-dir --upgrade setuptools[core] wheel
 
 ./install_user_dev
 

@@ -1030,7 +1030,7 @@ def DO_2xml(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
                     return RET(1, '', 'For the moment upload the resulting file by hand in grid')
                 output_file = lfn_prefix_re.sub('', output_file)
                 try:
-                    with open(output_file, 'w', encoding = "ascii", errors = "replace") as f: f.write(xml_coll)
+                    with open(output_file, 'w', encoding = "utf-8") as f: f.write(xml_coll)  # local paths can be non-ascii
                 except Exception as e:
                     logging.exception(e)
                     return RET(1, '', f'Error writing {output_file}')
@@ -1066,7 +1066,7 @@ def DO_2xml(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
                 return RET(1, '', 'For the moment upload the resulting file by hand in grid')
             output_file = lfn_prefix_re.sub('', output_file)
             try:
-                with open(output_file, 'w', encoding = "ascii", errors = "replace") as f: f.write(xml_coll)
+                with open(output_file, 'w', encoding = "utf-8") as f: f.write(xml_coll)  # local paths can be non-ascii
             except Exception as e:
                 logging.exception(e)
                 return RET(1, '', f'Error writing {output_file}')

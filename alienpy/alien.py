@@ -62,7 +62,7 @@ from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
 from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
-from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, token_env_content
+from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
@@ -1258,14 +1258,53 @@ def DO_token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
     return dataclasses.replace(ret_obj, out = f'{msg}{ret_obj.out}')
 
 
-def DO_token_init(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
-    """Run token-init command"""
+def DO_token_init(wb: Optional[WebSocketClientProtocol], args: Optional[list] = None) -> RET:
+    """Run token-init command: a valid token is kept, unless token creation arguments are given; wb is None if there is no connection yet"""
     if args is None: args = []
     if len(args) > 0 and is_help(args):
         ret_obj = SendMsg(wb, 'token', ['-h'], opts = 'nokeys')
-        return dataclasses.replace(ret_obj, out = ret_obj.out.replace('usage: token', 'INFO: token is automatically created, use this for token customization\nusage: token-init'))
-    wb = token_regen(wb, args)
-    return CertInfo(TOKENCERT_NAME)
+        msg = 'INFO: without arguments the token is created only if there is no valid token; with token arguments the token is re-created\nusage: token-init'
+        quiet_help = f'{" " * 20}{"-q, -quiet":<21}  :  do not print anything on stdout'  # JAliEn help option format
+        return dataclasses.replace(ret_obj, out = f"{ret_obj.out.replace('usage: token', msg).rstrip()}\n{quiet_help}")
+    quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed from the token arguments
+
+    def token_info(cert: str, header: str = '') -> RET:
+        """Token information as result of the command"""
+        ret_obj = CertInfo(cert)
+        if ret_obj.exitcode != 0: return ret_obj
+        if quiet: return RET(0)
+        return dataclasses.replace(ret_obj, out = f'{header}\n{ret_obj.out}' if header else ret_obj.out)
+
+    token_cert, _ = get_valid_tokens()  # checked now: the token could have been destroyed or have expired
+    if token_cert and not args:
+        if token_env_content(): return token_info(token_cert, 'Token is present in environment; unset JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY to (re)create the token with user certificates')
+        return token_info(token_cert, 'Token present; use token-destroy to recreate the token')
+
+    if token_env_content():  # a new token could not be stored (and would not be used)
+        if not token_cert:
+            return RET(1, '', 'The token given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables is not valid and a new token cannot be stored (unset these variables)')  # EPERM
+        print_err('WARNING: the token is given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables: it is not re-created, the token arguments are ignored')
+        return token_info(token_cert)
+
+    # the token is (re)created: there is no valid token or token creation arguments were given
+    if not (wb and AlienSessionInfo['use_usercert']):  # a usercert connection is needed: check the usercert before closing the current connection
+        user_cert, _ = get_valid_certs()
+        if not user_cert:
+            reason = cred_invalid_reason(USERCERT_NAME, USERKEY_NAME) or 'unknown problem'
+            if not token_cert: return RET(5, '', f'The token could not be created, no valid user certificate: {reason}')  # EIO, as for the failed connection
+            print_err(f'WARNING: the token was not re-created, no valid user certificate: {reason}')
+            return token_info(token_cert)
+
+    wb, exitcode = token_regen(wb, args, cmdlist_func = constructCmdList)
+    if exitcode != 0:
+        if wb is None and token_cert:  # the usercert connection failed (the reason is printed above)
+            print_err('WARNING: the token was not re-created (no connection with the user certificate), the existing valid token is kept')
+            return token_info(token_cert)
+        return RET(exitcode, '', f'The token could not be created{", the existing token is kept" if token_cert else ""}')
+
+    new_token_cert, _ = get_valid_tokens()
+    if not new_token_cert: return RET(1, '', f'The created token is not valid: {cred_invalid_reason(TOKENCERT_NAME, TOKENKEY_NAME)}')
+    return token_info(new_token_cert)
 
 
 def DO_edit(wb: WebSocketClientProtocol, args: Optional[list] = None, editor: str = '') -> RET:
@@ -1908,10 +1947,14 @@ def ProcessInput(wb: WebSocketClientProtocol, cmd: str, args: Optional[list] = N
     if ret_obj.ansdict and 'metadata' in ret_obj.ansdict and 'timing_ms' in ret_obj.ansdict['metadata']:
         ret_obj = dataclasses.replace(ret_obj, out = f"{ret_obj.out}\ntiming_ms = {ret_obj.ansdict['metadata']['timing_ms']}")
 
-    if shellcmd and ret_obj.out:
+    return shell_pipe(ret_obj, shellcmd)
+
+
+def shell_pipe(ret_obj: RET, shellcmd: Optional[str] = None) -> RET:
+    """Pipe the stdout of a successful command to the shell command"""
+    if shellcmd and ret_obj.exitcode == 0 and ret_obj.out:
         shell_run = subprocess.run(shellcmd, stdout = subprocess.PIPE, stderr = subprocess.PIPE, input = f'{ret_obj.out}\n', encoding = 'utf-8', errors = 'replace', shell = True)  # pylint: disable=subprocess-run-check # env=os.environ default is already the process env  # nosec
         return RET(exitcode = shell_run.returncode, out = shell_run.stdout, err = shell_run.stderr, ansdict = ret_obj.ansdict)
-
     return ret_obj
 
 
@@ -1996,14 +2039,15 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
         else:
             if _wb_api.ALIENPY_GLOBAL_WB is not None and _wb_api.ALIENPY_GLOBAL_WB is not wb:  # connection was replaced (reconnection, token-init)
                 wb = ALIENPY_GLOBAL_WB = _wb_api.ALIENPY_GLOBAL_WB
-            if wb is None:
-                # If not prezent init connection and if command is token-init (without help being invoked) then use usercert
-                is_token_init = cmd == 'token-init' and not is_help(args)  # DO_token_init will generate the token (with args)
-                wb = InitConnection(wb, args if cmd == 'token-init' else [], use_usercert = is_token_init, cmdlist_func = constructCmdList, gen_token = not is_token_init)
-                ALIENPY_GLOBAL_WB = wb
-            if not '-allkeys' in args or not 'allkeys' in args:
-                args.append('-nokeys')  # Disable return of the keys. ProcessCommandChain is used for user-based communication so json keys are not needed
-            ret_obj = ProcessInput(wb, cmd, args, pipe_to_shell_cmd)
+            if wb is None and cmd == 'token-init' and not is_help(args):  # no connection yet: DO_token_init connects only if the token is to be created
+                ret_obj = shell_pipe(DO_token_init(None, args), pipe_to_shell_cmd)
+            else:
+                if wb is None:
+                    wb = InitConnection(wb, cmdlist_func = constructCmdList)
+                    ALIENPY_GLOBAL_WB = wb
+                if not '-allkeys' in args or not 'allkeys' in args:
+                    args.append('-nokeys')  # Disable return of the keys. ProcessCommandChain is used for user-based communication so json keys are not needed
+                ret_obj = ProcessInput(wb, cmd, args, pipe_to_shell_cmd)
 
         _exitcode = retf_print(ret_obj, print_opts)  # save exitcode for easy retrieval
         AlienSessionInfo['exitcode'] = _exitcode

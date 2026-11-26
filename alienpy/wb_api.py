@@ -509,22 +509,28 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
     return int(0)
 
 
-def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> WebSocketClientProtocol:
-    """Do the disconnect, connect with user cert, generate token, re-connect with token procedure"""
+def token_regen(wb: Optional[WebSocketClientProtocol], args: Optional[list] = None, cmdlist_func: Optional[Callable] = None) -> tuple:
+    """Do the disconnect, connect with user cert, generate token, re-connect with token procedure; return (connection, exitcode of the token creation)
+    wb is None if there is no connection yet (cmdlist_func is then used for the session initialization);
+    if the usercert connection is not possible the process is not ended: (None, exitcode) is returned"""
     wb = wb_live(wb)  # close/replace the current session connection, not a stale one held by the caller
     wb_usercert = wb  # if the session is already on usercert, generate the token on the current connection
     if not args: args = []
 
-    if 'AlienSessionInfo' in globals() and not AlienSessionInfo['use_usercert']:
-        _ = wb_close(wb, code = 1000, reason = 'Lets connect with usercert to be able to generate token')
+    if 'AlienSessionInfo' in globals() and (wb is None or not AlienSessionInfo['use_usercert']):
+        if wb is not None: _ = wb_close(wb, code = 1000, reason = 'Lets connect with usercert to be able to generate token')
         try:
-            wb_usercert = InitConnection(wb, args, use_usercert = True, gen_token = False)  # usercert connection; the token is generated below
+            wb_usercert = InitConnection(wb, args, use_usercert = True, cmdlist_func = cmdlist_func, gen_token = False)  # usercert connection; the token is generated below
+        except SystemExit as e:  # AlienConnect ends the process if the connection is not possible (the reason is already printed)
+            AlienSessionInfo['use_usercert'] = False  # set before the failure; a valid token is to be used by the next connection
+            return None, (e.code if isinstance(e.code, int) and e.code else 1)
         except Exception:
             logging.debug(traceback.format_exc())
-            return None  # we failed usercert connection
+            return None, 1  # we failed usercert connection
 
     # now we are connected with usercert, so we can generate token
-    if token(wb_usercert, args) != 0: return wb_usercert
+    token_exitcode = token(wb_usercert, args)
+    if token_exitcode != 0: return wb_usercert, token_exitcode
     # we have to reconnect with the new token
     _ = wb_close(wb_usercert, code = 1000, reason = 'Re-initialize the connection with the new token')
     if 'AlienSessionInfo' in globals(): AlienSessionInfo['use_usercert'] = False
@@ -534,7 +540,7 @@ def token_regen(wb: WebSocketClientProtocol, args: Optional[list] = None) -> Web
         __ = SendMsg(wb_token_new, 'pwd', [], opts = 'nokeys')  # just to refresh cwd
     except Exception:
         logging.exception('token_regen:: error re-initializing connection')
-    return wb_token_new
+    return wb_token_new, 0
 
 
 def cd(wb: WebSocketClientProtocol, args: Union[str, list, None] = None, opts: str = '') -> RET:

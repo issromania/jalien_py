@@ -62,7 +62,7 @@ from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
 from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
-from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content
+from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cert_invalid_reason, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
@@ -1729,18 +1729,37 @@ def DO_tokendestroy(args: Optional[list] = None) -> RET:
     return RET(0, "Token was destroyed! Re-connect for token re-creation.")
 
 
+def cert_valid_ret(ret_obj: RET, cert: str, quiet: bool = False, warn_only: bool = False) -> RET:
+    """Result of cert-info/token-info/certkey-match/tokenkey-match: an error if the certificate is not valid (then the information goes to stderr);
+    warn_only: only a warning for a not valid certificate (the result is kept); quiet: nothing on stdout"""
+    if ret_obj.exitcode == 0:
+        reason = cert_invalid_reason(cert)
+        if reason and warn_only: print_err(f'WARNING: {reason}')
+        elif reason: return RET(1, '', f'{ret_obj.out}\n{reason}'.strip(), ret_obj.ansdict)
+    if quiet: return dataclasses.replace(ret_obj, out = '')
+    return ret_obj
+
+
+CERT_CHECK_HELP = 'exitcode != 0 if the certificate is not valid (missing, expired or less than 10 min left)\n-q, -quiet : do not print anything on stdout'
+CERT_MATCH_HELP = 'only the match is checked: for a not valid certificate (expired or less than 10 min left) a warning is printed\n-q, -quiet : do not print anything on stdout'
+
+
 def DO_certinfo(args: Optional[list] = None) -> RET:
     """Print user certificate information"""
     if args is None: args = []
-    if len(args) > 0 and is_help(args): return RET(0, "Print user certificate information", "")
-    return CertInfo(AlienSessionInfo['user_cert'] or USERCERT_NAME)  # session value is set only if valid
+    if len(args) > 0 and is_help(args): return RET(0, f"Print user certificate information; {CERT_CHECK_HELP}", "")
+    quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
+    cert = AlienSessionInfo['user_cert'] or USERCERT_NAME  # session value is set only if valid
+    return cert_valid_ret(CertInfo(cert), cert, quiet)
 
 
 def DO_tokeninfo(args: Optional[list] = None) -> RET:
     """Print token certificate information"""
     if not args: args = []
-    if len(args) > 0 and is_help(args): return RET(0, "Print token certificate information", "")
-    return CertInfo(AlienSessionInfo['token_cert'] or TOKENCERT_NAME)  # session value is set only if valid
+    if len(args) > 0 and is_help(args): return RET(0, f"Print token certificate information; {CERT_CHECK_HELP}", "")
+    quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
+    cert = AlienSessionInfo['token_cert'] or TOKENCERT_NAME  # session value is set only if valid
+    return cert_valid_ret(CertInfo(cert), cert, quiet)
 
 
 def DO_certverify(args: Optional[list] = None) -> RET:
@@ -1760,15 +1779,19 @@ def DO_tokenverify(args: Optional[list] = None) -> RET:
 def DO_certkeymatch(args: Optional[list] = None) -> RET:
     """Check match of user cert with key cert"""
     if args is None: args = []
-    if len(args) > 0 and is_help(args): return RET(0, "Check match of user cert with key cert", "")
-    return CertKeyMatch(AlienSessionInfo['user_cert'] or USERCERT_NAME, AlienSessionInfo['user_key'] or USERKEY_NAME)  # session values are set only if valid
+    if len(args) > 0 and is_help(args): return RET(0, f"Check match of user cert with key cert; {CERT_MATCH_HELP}", "")
+    quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
+    cert = AlienSessionInfo['user_cert'] or USERCERT_NAME  # session values are set only if valid
+    return cert_valid_ret(CertKeyMatch(cert, AlienSessionInfo['user_key'] or USERKEY_NAME), cert, quiet, warn_only = True)
 
 
 def DO_tokenkeymatch(args: Optional[list] = None) -> RET:
     """Check match of user token with key token"""
     if args is None: args = []
-    if len(args) > 0 and is_help(args): return RET(0, "Check match of user token with key token", "")
-    return CertKeyMatch(AlienSessionInfo['token_cert'] or TOKENCERT_NAME, AlienSessionInfo['token_key'] or TOKENKEY_NAME)  # session values are set only if valid
+    if len(args) > 0 and is_help(args): return RET(0, f"Check match of user token with key token; {CERT_MATCH_HELP}", "")
+    quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
+    cert = AlienSessionInfo['token_cert'] or TOKENCERT_NAME  # session values are set only if valid
+    return cert_valid_ret(CertKeyMatch(cert, AlienSessionInfo['token_key'] or TOKENKEY_NAME), cert, quiet, warn_only = True)
 
 
 def DO_getCAcerts(args: Optional[list] = None) -> RET:

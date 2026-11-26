@@ -29,6 +29,7 @@ from .async_tools import get_loop, syncify
 from .wb_async import IsWbConnected, wb_close, wb_create, wb_sendmsg, wb_sendmsg_multi
 from .tools_nowb import CreateJsonCommand, PrintDict, deltat_ms_perf, deltat_us_perf, isReachable, is_help, is_my_pid, path_readable, read_conf_file, writePidFile
 from .tools_stackcmd import push2stack  # , deque_pop_pos
+from .connect_ssl import token_env_content
 
 
 def wb_create_tryout(host: str, port: Union[str, int], path: str = '/', use_usercert: bool = False, localConnect: bool = False) -> WebSocketClientProtocol:
@@ -461,6 +462,9 @@ def _private_opener(path: str, flags: int) -> int:
 def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
     """(Re)create the tokencert and tokenkey files"""
     if not wb: return 1
+    if token_env_content():  # the env variables (not files) would still be used
+        print_err('The token is given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables: a new token cannot be stored')
+        return 1  # EPERM
     if not args: args = []
     certs_info = get_certs_names()
     _ = is_help(args, clean_args = True)

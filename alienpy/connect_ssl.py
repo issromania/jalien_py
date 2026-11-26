@@ -27,7 +27,7 @@ except Exception:
 ##   GLOBALS
 from .setup_logging import DEBUG, DEBUG_FILE, print_err
 from .data_structs import CertsInfo, RET, SSLctxException
-from .global_vars import AlienSessionInfo, COLORS, TOKENCERT_NAME, TOKENKEY_NAME, USERCERT_NAME, USERKEY_NAME, USER_HOME, I_AM_GRID_JOB
+from .global_vars import AlienSessionInfo, COLORS, TOKENCERT_NAME, TOKENKEY_NAME, USERCERT_NAME, USERKEY_NAME, USER_HOME, I_AM_GRID_JOB, get_certs_names
 from .tools_nowb import PrintColor, path_readable
 
 
@@ -190,19 +190,30 @@ def get_valid_certs() -> tuple:
     return (USERCERT_NAME, USERKEY_NAME)
 
 
+PEM_CERT_BEGIN = '-----BEGIN CERTIFICATE-----'
+PEM_KEY_BEGIN = ('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----', '-----BEGIN EC PRIVATE KEY-----')  # PKCS#1, PKCS#8, SEC1
+
+
+def token_env_content() -> bool:
+    """True if JALIEN_TOKEN_CERT or JALIEN_TOKEN_KEY hold the PEM content (not a file name): such a token cannot be written, re-created or destroyed"""
+    certs_info = get_certs_names()
+    return (certs_info.token_cert.startswith(PEM_CERT_BEGIN) and not path_readable(certs_info.token_cert)) or \
+           (certs_info.token_key.startswith(PEM_KEY_BEGIN) and not path_readable(certs_info.token_key))
+
+
 def get_valid_tokens() -> tuple:
     """Get the token filenames, including the temporary ones used as env variables"""
     global TOKENCERT_NAME, TOKENKEY_NAME
     cert_suffix = None
     ENV_TOKENCERT = ENV_TOKENKEY = None
-    if not path_readable(TOKENCERT_NAME) and TOKENCERT_NAME.startswith('-----BEGIN CERTIFICATE-----'):  # and is not a file
+    if not path_readable(TOKENCERT_NAME) and TOKENCERT_NAME.startswith(PEM_CERT_BEGIN):  # and is not a file
         cert_suffix = f'_{str(os.getuid())}_{str(uuid.uuid4())}.pem'
         temp_cert = tempfile.NamedTemporaryFile(prefix = 'tokencert_', suffix = cert_suffix, delete = False)
         temp_cert.write(TOKENCERT_NAME.encode(encoding = "ascii", errors = "replace"))
         temp_cert.close()
         TOKENCERT_NAME = temp_cert.name  # temp file was created, let's give the filename to tokencert
         ENV_TOKENCERT = True
-    if not path_readable(TOKENKEY_NAME) and TOKENKEY_NAME.startswith(('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----', '-----BEGIN EC PRIVATE KEY-----')):  # PKCS#1, PKCS#8, SEC1; and is not a file
+    if not path_readable(TOKENKEY_NAME) and TOKENKEY_NAME.startswith(PEM_KEY_BEGIN):  # and is not a file
         temp_key = tempfile.NamedTemporaryFile(prefix = 'tokenkey_', suffix = cert_suffix, delete = False)
         temp_key.write(TOKENKEY_NAME.encode(encoding = "ascii", errors = "replace"))
         temp_key.close()

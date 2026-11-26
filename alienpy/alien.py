@@ -62,7 +62,7 @@ from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
 from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
-from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cert_invalid_reason, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content
+from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cert_invalid_reason, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content, token_files
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
@@ -1758,7 +1758,7 @@ def DO_tokeninfo(args: Optional[list] = None) -> RET:
     if not args: args = []
     if len(args) > 0 and is_help(args): return RET(0, f"Print token certificate information; {CERT_CHECK_HELP}", "")
     quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
-    cert = AlienSessionInfo['token_cert'] or TOKENCERT_NAME  # session value is set only if valid
+    cert, _ = token_files()  # also the temporary copy of an invalid JALIEN_TOKEN_CERT content
     return cert_valid_ret(CertInfo(cert), cert, quiet)
 
 
@@ -1773,7 +1773,7 @@ def DO_tokenverify(args: Optional[list] = None) -> RET:
     """Print token certificate information"""
     if not args: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Print token certificate information", "")
-    return CertVerify(AlienSessionInfo['token_cert'] or TOKENCERT_NAME)  # session value is set only if valid
+    return CertVerify(token_files()[0])  # also the temporary copy of an invalid JALIEN_TOKEN_CERT content
 
 
 def DO_certkeymatch(args: Optional[list] = None) -> RET:
@@ -1790,8 +1790,8 @@ def DO_tokenkeymatch(args: Optional[list] = None) -> RET:
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, f"Check match of user token with key token; {CERT_MATCH_HELP}", "")
     quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed
-    cert = AlienSessionInfo['token_cert'] or TOKENCERT_NAME  # session values are set only if valid
-    return cert_valid_ret(CertKeyMatch(cert, AlienSessionInfo['token_key'] or TOKENKEY_NAME), cert, quiet, warn_only = True)
+    cert, key = token_files()  # also the temporary copies of an invalid JALIEN_TOKEN_{CERT,KEY} content
+    return cert_valid_ret(CertKeyMatch(cert, key), cert, quiet, warn_only = True)
 
 
 def DO_getCAcerts(args: Optional[list] = None) -> RET:

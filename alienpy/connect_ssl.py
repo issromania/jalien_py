@@ -232,6 +232,12 @@ def get_valid_tokens() -> tuple:
     return (None, None)
 
 
+def token_files() -> tuple:
+    """Return the token cert and key file names also when the token is not valid (for JALIEN_TOKEN_{CERT,KEY} content: the temporary copies)"""
+    _ = get_valid_tokens()  # it makes the temporary copies of the env content
+    return (TOKENCERT_NAME, TOKENKEY_NAME)
+
+
 def renewCredFilesInfo() -> CertsInfo:
     """Recheck and refresh the values of valid credential definitions"""
     token_cert, token_key = get_valid_tokens()

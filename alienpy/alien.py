@@ -62,7 +62,7 @@ from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION
 from .wb_api import InitConnection, SendMsg, cd, get_help_srv, retf_print, token_regen, wb_ping
 from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB (replaced on reconnection/token-init)
 ##   SSL RELATED VARIABLES: TOKEN AND CERT NAMES
-from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path
+from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, token_env_content
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
@@ -1683,6 +1683,8 @@ def DO_tokendestroy(args: Optional[list] = None) -> RET:
     """Delete the token{cert,key}.pem files"""
     if args is None: args = []
     if len(args) > 0 and is_help(args): return RET(0, "Delete the token{cert,key}.pem files")
+    if token_env_content():  # only the temporary copies could be removed, the token would still be used
+        return RET(1, '', 'The token is given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables: it cannot be destroyed (unset these variables to not use it)')  # EPERM
     if os.path.exists(AlienSessionInfo['token_cert']): os.remove(AlienSessionInfo['token_cert'])
     if os.path.exists(AlienSessionInfo['token_key']): os.remove(AlienSessionInfo['token_key'])
     return RET(0, "Token was destroyed! Re-connect for token re-creation.")

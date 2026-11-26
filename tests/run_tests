@@ -9,11 +9,18 @@ SCRIPT_DIR="$(realpath --canonicalize-existing "$( cd -- "$( dirname -- "${BASH_
 
 mapfile -t test_dirlist < <(find "${SCRIPT_DIR}" -type d -name "*.test" | sort)  # one entry per line: paths with spaces
 
+# not run in CI (ci-tests, as in alidist xjalienfs.sh): CI has only a token, given by JALIEN_TOKEN_{CERT,KEY}, and no user certificate;
+# these tests are about the credentials of the user (default token files, token creation/destroy with the user certificate)
+CI_SKIP_TESTS=("002_env_tokens.test" "012_token_init.test")
+
 FAILED_TESTS="0"
 
 for t in "${test_dirlist[@]}"; do
     TEST_NAME="$(basename "${t}")"
-    [[ -n "${IS_CI}" && "${TEST_NAME}" == "002_env_tokens.test" ]] && continue;
+    if [[ -n "${IS_CI}" && " ${CI_SKIP_TESTS[*]} " == *" ${TEST_NAME} "* ]]; then
+        echo -e "Skipping test : ${TEST_NAME} (not run in CI)\n"
+        continue
+    fi
 
     echo "Running test : ${TEST_NAME} ... "
     pushd "${t}" &> /dev/null

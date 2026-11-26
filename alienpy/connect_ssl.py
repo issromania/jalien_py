@@ -219,14 +219,15 @@ def get_valid_tokens() -> tuple:
         temp_key.close()
         TOKENKEY_NAME = temp_key.name  # temp file was created, let's give the filename to tokenkey
         ENV_TOKENKEY = True
+    if 'AlienSessionInfo' in globals():  # the temporary copies are removed at exit, also when the token is not valid
+        if ENV_TOKENCERT: AlienSessionInfo['templist'].append(TOKENCERT_NAME)  # type: ignore[attr-defined]
+        if ENV_TOKENKEY: AlienSessionInfo['templist'].append(TOKENKEY_NAME)  # type: ignore[attr-defined]
 
     if IsValidCert(TOKENCERT_NAME) and path_readable(TOKENKEY_NAME):
         if 'AlienSessionInfo' in globals():
             AlienSessionInfo['verified_token'] = True
             AlienSessionInfo['token_cert'] = TOKENCERT_NAME
             AlienSessionInfo['token_key'] = TOKENKEY_NAME
-            if ENV_TOKENCERT: AlienSessionInfo['templist'].append(TOKENCERT_NAME)  # type: ignore[attr-defined]
-            if ENV_TOKENKEY: AlienSessionInfo['templist'].append(TOKENKEY_NAME)  # type: ignore[attr-defined]
         return (TOKENCERT_NAME, TOKENKEY_NAME)
     return (None, None)
 

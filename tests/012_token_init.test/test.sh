@@ -2,13 +2,14 @@
 
 # token-init with a present and valid token: kept (no re-creation), -q/-quiet, token given as env content, token-destroy;token-init,
 # token arguments when the user certificate is not usable; the token files of the user are never removed or re-created by this test
+# the token of the environment is used: JALIEN_TOKEN_{CERT,KEY} (file names or content) or the default token files;
+# no user certificate is needed if the token is valid (CI tests have only a token)
 
 clean_logs () { rm -f log.txt out.log err.log &> /dev/null; }
 
 clean_logs
 export ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt ALIENPY_DEBUG_APPEND=1
 export ALIENPY_NO_HISTORY=1  # do not read/write the user history
-unset JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY
 
 TEST_SCRIPT="$(realpath "${0}")"
 THIS_TEST="$(basename "$(dirname "${TEST_SCRIPT}")")/$(basename "${TEST_SCRIPT}")"
@@ -50,12 +51,30 @@ expect_err () { grep -qF "${2}" err.log || fail "${1}" "the stderr contains >${2
 PRESENT='Token present; use token-destroy to recreate the token'
 PRESENT_ENV='Token is present in environment; unset JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY to (re)create the token with user certificates'
 TMPDIR="${TMPDIR:-/tmp}"
-FILECERT="${TMPDIR}/tokencert_$(id -u).pem"
-FILEKEY="${TMPDIR}/tokenkey_$(id -u).pem"
+WORKDIR="$(mktemp -d "${TMPDIR}/alienpy_ci_token_XXXXXX")" || { echo "Could not create a temporary directory in ${THIS_TEST}"; exit 1; }
+trap 'rm -rf "${WORKDIR}" &> /dev/null' EXIT
 
-# a valid token is needed: it is created only if missing or not valid
+# a valid token is needed: it is created only if missing or not valid (that needs a user certificate)
 expect_ok "token-init (prerequisite: a valid token)" alien.py token-init
+
+# token_file <env value> <default file> <file for the content> : the file of the token cert/key; the env content is saved in a file of WORKDIR
+token_file () {
+if [[ "${1}" == -----BEGIN* ]]; then
+    (umask 077; printf '%s\n' "${1}" > "${3}")
+    echo "${3}"
+elif [[ -n "${1}" ]]; then
+    echo "${1}"
+else
+    echo "${2}"
+fi
+}
+FILECERT="$(token_file "${JALIEN_TOKEN_CERT}" "${TMPDIR}/tokencert_$(id -u).pem" "${WORKDIR}/tokencert.pem")"
+FILEKEY="$(token_file "${JALIEN_TOKEN_KEY}" "${TMPDIR}/tokenkey_$(id -u).pem" "${WORKDIR}/tokenkey.pem")"
 [[ -f "${FILECERT}" && -f "${FILEKEY}" ]] || fail "token-init (prerequisite: a valid token)" "the token files ${FILECERT} ${FILEKEY}"
+
+# token given as file names
+export JALIEN_TOKEN_CERT="${FILECERT}"
+export JALIEN_TOKEN_KEY="${FILEKEY}"
 
 expect_ok "token-init with a valid token" alien.py token-init
 expect_line "token-init with a valid token" "${PRESENT}"
@@ -87,7 +106,6 @@ expect_line "token-destroy;token-init with the token as env content" "${PRESENT_
 expect_ok "token-init with token arguments and the token as env content" alien.py token-init -v 1
 expect_err "token-init with token arguments and the token as env content" "it is not re-created"
 
-unset JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY
 [[ -f "${FILECERT}" && -f "${FILEKEY}" ]] || fail "token files kept" "the token files ${FILECERT} ${FILEKEY}"
 
 clean_logs

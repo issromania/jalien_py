@@ -2051,14 +2051,7 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
             AlienSessionInfo['exitcode'] = _exitcode
             continue
         cmd = args_ini.pop(0)
-
-        # reprocess arguments in case the main argument list is passed as quoted string
-        # such is the case of alien_<command> 'list of arguments'
-        args = []
-        if len(args_ini) == 1:
-            for i in args_ini: args.extend(shlex.split(i.strip(), posix = False))
-        else:
-            args = args_ini
+        args = args_ini  # a quoted argument stays a single argument (alien_<command> 'list of arguments': see cmdline_from_verb)
 
         # if globally enabled then enable per command OR if enabled for this command
         JSON_OUT_CMD = None
@@ -2237,7 +2230,7 @@ def main() -> None:
 
     exec_name = Path(ALIENPY_EXECUTABLE).name
     verb = exec_name.replace('alien_', '') if exec_name.startswith('alien_') else ''
-    if verb: sys.argv.insert(0, verb)
+    if verb: sys.argv = cmdline_from_verb(verb, sys.argv)
 
     arg_list = None
     # batch mode: the only argument is an existing file given as a path (containing / or .)
@@ -2267,9 +2260,16 @@ ALIENPY_DEBUG=1 ALIENPY_DEBUG_FILE=log.txt your_command_line''')
         sys.exit(1)
 
 
+def cmdline_from_verb(verb: str, user_args: list) -> list:
+    """Arguments for alien_<command> and alien-<command>: a single argument with spaces (quoted in the shell) is the 'list of arguments'
+    of the command, so it is given as one command line (split as by alien.py "command line"); otherwise the verb is put in front"""
+    if len(user_args) == 1 and any(c.isspace() for c in user_args[0]): return [f'{verb} {user_args[0]}']
+    return [verb, *user_args]
+
+
 def _cmd(what: str) -> None:
     """Run given cmd or main"""
-    sys.argv = [sys.argv[0]] + [what] + sys.argv[1:]
+    sys.argv = [sys.argv[0], *cmdline_from_verb(what, sys.argv[1:])]
     main()
 
 

@@ -2009,9 +2009,13 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
     # recompune argument list as string for easy alias processing
     if isinstance(cmd_chain, list):
         if len(cmd_chain) == 1:
-            cmd_string = dequote(cmd_chain[0])
+            cmd_string = dequote(cmd_chain[0])  # a single argument is the command line: it is split taking into account the quotes
+        elif '|' in cmd_chain:  # several arguments are kept as they are; an argument that is exactly | is the pipe to a shell command
+            pipe_idx = cmd_chain.index('|')
+            shell_cmd = ' '.join(arg if arg == '|' else shlex.quote(arg) for arg in cmd_chain[pipe_idx + 1:])
+            cmd_string = f'{shlex_join(cmd_chain[:pipe_idx])} | {shell_cmd}'
         else:
-            cmd_string = shlex_join(cmd_chain) if isinstance(cmd_chain, list) else cmd_chain
+            cmd_string = shlex_join(cmd_chain)  # several arguments are kept as they are
     else:
         cmd_string = cmd_chain
 

@@ -55,7 +55,7 @@ setup_logging(bool(DEBUG), DEBUG_FILE)  # Initialize logging
 ##   IMPORT DATA STRUCTURES
 from .data_structs import RET
 ##   IMPORT GLOBAL VARIABLES
-from .global_vars import ALIENPY_EXECUTABLE, ALIENPY_GLOBAL_WB, AlienSessionInfo, COLORS, TOKENCERT_NAME, TOKENKEY_NAME, USERCERT_NAME, USERKEY_NAME, USER_AGENT_HTTP, cmds_split, lfn_prefix_re, specs_split, time_pattern_match_13
+from .global_vars import ALIENPY_EXECUTABLE, ALIENPY_GLOBAL_WB, AlienSessionInfo, COLORS, TOKENCERT_NAME, TOKENKEY_NAME, USERCERT_NAME, USERKEY_NAME, USER_AGENT_HTTP, lfn_prefix_re, specs_split, time_pattern_match_13
 ##   IMPORT VERSION STRINGS
 from .version import ALIENPY_VERSION_DATE, ALIENPY_VERSION_HASH, ALIENPY_VERSION_STR
 ##   ASYNCIO MECHANICS
@@ -2020,7 +2020,7 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
         for alias, alias_value in AlienSessionInfo['alias_cache'].items(): cmd_string = cmd_string.replace(alias, alias_value)
 
     # split compounded commands delimited by ';' and '\n' in individual commands
-    cmdline_list = [str(cmd).strip() for cmd in cmds_split.split(cmd_string)]
+    cmdline_list = [str(cmd).strip() for cmd in unquoted_split(cmd_string, (';', '\n'))]  # a ; within a quoted argument is part of the argument
 
     # for each command, save exitcode and RET of the command
     _exitcode = -1

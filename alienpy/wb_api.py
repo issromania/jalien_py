@@ -509,34 +509,36 @@ def token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> int:
     return int(0)
 
 
-def token_regen(wb: Optional[WebSocketClientProtocol], args: Optional[list] = None, cmdlist_func: Optional[Callable] = None) -> tuple:
+def token_regen(wb: Optional[WebSocketClientProtocol], args: Optional[list] = None, cmdlist_func: Optional[Callable] = None, renew: bool = False) -> tuple:
     """Do the disconnect, connect with user cert, generate token, re-connect with token procedure; return (connection, exitcode of the token creation)
+    renew: the token is requested on a connection with the present (valid) token instead of the user cert;
     wb is None if there is no connection yet (cmdlist_func is then used for the session initialization);
-    if the usercert connection is not possible the process is not ended: (None, exitcode) is returned"""
+    if the connection is not possible the process is not ended: (None, exitcode) is returned"""
     wb = wb_live(wb)  # close/replace the current session connection, not a stale one held by the caller
-    wb_usercert = wb  # if the session is already on usercert, generate the token on the current connection
+    wb_request = wb  # if the session is already on the needed credential (usercert or token), request the token on the current connection
     if not args: args = []
 
-    if 'AlienSessionInfo' in globals() and (wb is None or not AlienSessionInfo['use_usercert']):
-        if wb is not None: _ = wb_close(wb, code = 1000, reason = 'Lets connect with usercert to be able to generate token')
+    if 'AlienSessionInfo' in globals() and (wb is None or AlienSessionInfo['use_usercert'] == renew):
+        if wb is not None: _ = wb_close(wb, code = 1000, reason = f'Lets connect with {"token" if renew else "usercert"} to be able to generate token')
+        if renew: AlienSessionInfo['use_usercert'] = False  # create_ssl_context sets it only for usercert
         try:
-            wb_usercert = InitConnection(wb, args, use_usercert = True, cmdlist_func = cmdlist_func, gen_token = False)  # usercert connection; the token is generated below
+            wb_request = InitConnection(wb, args, use_usercert = not renew, cmdlist_func = cmdlist_func, gen_token = False)  # the token is generated below
         except SystemExit as e:  # AlienConnect ends the process if the connection is not possible (the reason is already printed)
             AlienSessionInfo['use_usercert'] = False  # set before the failure; a valid token is to be used by the next connection
             return None, (e.code if isinstance(e.code, int) and e.code else 1)
         except Exception:
             logging.debug(traceback.format_exc())
-            return None, 1  # we failed usercert connection
+            return None, 1  # we failed the connection
 
-    # now we are connected with usercert, so we can generate token
-    token_exitcode = token(wb_usercert, args)
-    if token_exitcode != 0: return wb_usercert, token_exitcode
+    # now we are connected with usercert (or the present token for renew), so we can generate token
+    token_exitcode = token(wb_request, args)
+    if token_exitcode != 0: return wb_request, token_exitcode
     # we have to reconnect with the new token
-    _ = wb_close(wb_usercert, code = 1000, reason = 'Re-initialize the connection with the new token')
+    _ = wb_close(wb_request, code = 1000, reason = 'Re-initialize the connection with the new token')
     if 'AlienSessionInfo' in globals(): AlienSessionInfo['use_usercert'] = False
     wb_token_new = None
     try:
-        wb_token_new = InitConnection(wb_usercert, args)  # pass the closed usercert wb: a new connection (with the new token) is required, never a reuse
+        wb_token_new = InitConnection(wb_request, args)  # pass the closed wb: a new connection (with the new token) is required, never a reuse
         __ = SendMsg(wb_token_new, 'pwd', [], opts = 'nokeys')  # just to refresh cwd
     except Exception:
         logging.exception('token_regen:: error re-initializing connection')

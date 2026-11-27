@@ -1259,14 +1259,22 @@ def DO_token(wb: WebSocketClientProtocol, args: Optional[list] = None) -> RET:
 
 
 def DO_token_init(wb: Optional[WebSocketClientProtocol], args: Optional[list] = None) -> RET:
-    """Run token-init command: a valid token is kept, unless token creation arguments are given; wb is None if there is no connection yet"""
+    """Run token-init command: a valid token is kept, unless token creation arguments, -renew or -renew-usercert are given; wb is None if there is no connection yet"""
     if args is None: args = []
     if len(args) > 0 and is_help(args):
         ret_obj = SendMsg(wb, 'token', ['-h'], opts = 'nokeys')
-        msg = 'INFO: without arguments the token is created only if there is no valid token; with token arguments the token is re-created\nusage: token-init'
-        quiet_help = f'{" " * 20}{"-q, -quiet":<21}  :  do not print anything on stdout'  # JAliEn help option format
-        return dataclasses.replace(ret_obj, out = f"{ret_obj.out.replace('usage: token', msg).rstrip()}\n{quiet_help}")
+        msg = ('INFO: without arguments (or only with -nomail) the token is created only if there is no valid token;\n'
+               'with token arguments, -renew or -renew-usercert the token is re-created\nusage: token-init')
+        client_help = '\n'.join(f'{" " * 20}{opt:<21}  :  {desc}' for opt, desc in (  # JAliEn help option format
+            ('-q, -quiet', 'do not print anything on stdout'),
+            ('-renew', 'request the new token with the present valid token (its validity limits the new one)'),
+            ('-renew-usercert', 'request the new token with the user certificate (also if the token is valid)')))
+        return dataclasses.replace(ret_obj, out = f"{ret_obj.out.replace('usage: token', msg).rstrip()}\n{client_help}")
     quiet = get_arg(args, '-q') | get_arg(args, '-quiet')  # not "or": both are removed from the token arguments
+    renew = get_arg(args, '-renew')
+    renew_usercert = get_arg(args, '-renew-usercert')
+    if renew and renew_usercert: return RET(22, '', '-renew and -renew-usercert are incompatible options, use only one')  # EINVAL
+    recreate = renew or renew_usercert or any(arg != '-nomail' for arg in args)  # -nomail alone does not request a new token
 
     def token_info(cert: str, header: str = '') -> RET:
         """Token information as result of the command"""
@@ -1276,29 +1284,35 @@ def DO_token_init(wb: Optional[WebSocketClientProtocol], args: Optional[list] = 
         return dataclasses.replace(ret_obj, out = f'{header}\n{ret_obj.out}' if header else ret_obj.out)
 
     token_cert, _ = get_valid_tokens()  # checked now: the token could have been destroyed or have expired
-    if token_cert and not args:
+    if token_cert and not recreate:
         if token_env_content(): return token_info(token_cert, 'Token is present in environment; unset JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY to (re)create the token with user certificates')
         return token_info(token_cert, 'Token present; use token-destroy to recreate the token')
 
     if token_env_content():  # a new token could not be stored (and would not be used)
         if not token_cert:
             return RET(1, '', 'The token given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables is not valid and a new token cannot be stored (unset these variables)')  # EPERM
-        print_err('WARNING: the token is given as content of the JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY environment variables: it is not re-created, the token arguments are ignored')
+        print_err('WARNING: JALIEN_TOKEN_CERT/JALIEN_TOKEN_KEY vars are used (token as content), these cannot be replaced within session! The token is not re-created')
         return token_info(token_cert)
 
-    # the token is (re)created: there is no valid token or token creation arguments were given
-    if not (wb and AlienSessionInfo['use_usercert']):  # a usercert connection is needed: check the usercert before closing the current connection
+    if renew and not token_cert:
+        return RET(1, '', 'There is no valid token to be renewed; for new token, just use the command without arguments')  # EPERM
+
+    # the token is (re)created: there is no valid token, or token creation arguments, -renew or -renew-usercert were given
+    if not renew and not (wb and AlienSessionInfo['use_usercert']):  # a usercert connection is needed: check the usercert before closing the current connection
         user_cert, _ = get_valid_certs()
         if not user_cert:
             reason = cred_invalid_reason(USERCERT_NAME, USERKEY_NAME) or 'unknown problem'
+            if renew_usercert: return RET(2, '', f'No user certificate to be used by this command: {reason}')  # ENOENT: the usercert was explicitly requested
             if not token_cert: return RET(5, '', f'The token could not be created, no valid user certificate: {reason}')  # EIO, as for the failed connection
             print_err(f'WARNING: the token was not re-created, no valid user certificate: {reason}')
             return token_info(token_cert)
 
-    wb, exitcode = token_regen(wb, args, cmdlist_func = constructCmdList)
+    wb, exitcode = token_regen(wb, args, cmdlist_func = constructCmdList, renew = renew)
     if exitcode != 0:
-        if wb is None and token_cert:  # the usercert connection failed (the reason is printed above)
-            print_err('WARNING: the token was not re-created (no connection with the user certificate), the existing valid token is kept')
+        if wb is None and renew_usercert:  # the usercert connection was explicitly requested and failed (the reason is printed above)
+            return RET(exitcode, '', f'The token could not be created with the user certificate{", the existing token is kept" if token_cert else ""}')
+        if wb is None and token_cert:  # the connection failed (the reason is printed above)
+            print_err(f'WARNING: the token was not re-created (no connection with the {"present token" if renew else "user certificate"}), the existing valid token is kept')
             return token_info(token_cert)
         return RET(exitcode, '', f'The token could not be created{", the existing token is kept" if token_cert else ""}')
 

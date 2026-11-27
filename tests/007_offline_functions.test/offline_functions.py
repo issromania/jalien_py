@@ -28,6 +28,7 @@ def check(name: str, got, expected) -> None:
 WORK_DIR = tempfile.mkdtemp(prefix = 'alienpy_offline_test_')
 os.environ['ALIENPY_DEBUG_FILE'] = os.path.join(WORK_DIR, 'alienpy_debug.log')
 
+from alienpy.alien import cmdline_from_verb  # noqa: E402
 from alienpy.global_vars import AlienSessionInfo  # noqa: E402
 from alienpy.tools_nowb import (CreateJsonCommand, create_metafile, expand_path_local, fileIsValid, filter_file_prop, format_dst_fn, get_arg,  # noqa: E402
                                 get_arg_2values, get_arg_value, get_arg_value_multiple, get_hash_meta, get_lfn_meta, get_lfn_name, get_size_meta,
@@ -317,10 +318,19 @@ def t_unquoted_split() -> None:
         check(f'unquoted_split({text!r})', unquoted_split(text, separators, maxsplit), expected)
 
 
+def t_cmdline_from_verb() -> None:
+    """alien_<command>/alien-<command>: a single argument with spaces is the list of arguments (one command line)"""
+    check('cmdline_from_verb(single with spaces)', cmdline_from_verb('ls', ["-l 'a b'"]), ["ls -l 'a b'"])
+    check('cmdline_from_verb(single word)', cmdline_from_verb('ls', ['/alice']), ['ls', '/alice'])
+    check('cmdline_from_verb(several)', cmdline_from_verb('ls', ['a b', 'c']), ['ls', 'a b', 'c'])
+    check('cmdline_from_verb(none)', cmdline_from_verb('pwd', []), ['pwd'])
+
+
 if __name__ == '__main__':
     try:
         for test in (t_expand_path_grid, t_expand_path_local, t_args, t_name2regex, t_format_dst_fn, t_list_files_local,
-                     t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack, t_unquoted_split):
+                     t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack, t_unquoted_split,
+                     t_cmdline_from_verb):
             print(f'Trying {test.__doc__.splitlines()[0]} ..', flush = True)
             try:
                 test()

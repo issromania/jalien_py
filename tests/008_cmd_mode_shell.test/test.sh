@@ -65,6 +65,42 @@ trying "pipe of pwd to grep without match: exitcode 1 of grep"
 run_rc alien.py "pwd | grep -q alienpy_ci_no_such_string"
 [[ "${RC}" == "1" ]] || fail "pipe to a shell command that fails" "exitcode 1 (of grep)"
 
+# quoted arguments: | ; and spaces within a quoted argument are part of the argument (no pipe, no chain, no split)
+trying "argument with ' | ' (separate argument): no pipe, ls fails as for a missing dir (${LS_FAIL_RC})"
+run_rc alien.py ls "${INVALID_DIR} | x"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "argument with ' | '" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
+grep -qF "Invalid command line" out.log && fail "argument with ' | '" "no command line error"
+
+trying "command line with a quoted ' | ': no pipe, ls fails as for a missing dir (${LS_FAIL_RC})"
+run_rc alien.py "ls '${INVALID_DIR} | x'"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "command line with a quoted ' | '" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
+grep -qF "Invalid command line" out.log && fail "command line with a quoted ' | '" "no command line error"
+
+trying "argument with ; (separate argument): no chain, ls fails as for a missing dir (${LS_FAIL_RC})"
+run_rc alien.py ls "${INVALID_DIR};pwd"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "argument with ;" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
+grep -qF "Invalid command line" out.log && fail "argument with ;" "no command line error"
+
+trying "argument with a space stays one argument: ls '<home> -l' fails (no such entry)"
+run_rc alien.py ls "${ALIEN_HOME} -l"
+[[ "${RC}" != "0" ]] || fail "argument with a space stays one argument" "exitcode != 0 (not ls -l of the home)"
+
+trying "command line with a quoted argument with a space: ls '<home> -l' fails (no such entry)"
+run_rc alien.py "ls '${ALIEN_HOME} -l'"
+[[ "${RC}" != "0" ]] || fail "command line with a quoted argument with a space" "exitcode != 0 (not ls -l of the home)"
+
+trying "command line with internal quotes: ls -l '<home>' works"
+run_rc alien.py "ls -l '${ALIEN_HOME}'"
+[[ "${RC}" == "0" ]] || fail "command line with internal quotes" "exitcode 0"
+
+trying "command line with internal double quotes: ls -l \"<home>\" works"
+run_rc alien.py 'ls -l "'"${ALIEN_HOME}"'"'
+[[ "${RC}" == "0" ]] || fail "command line with internal double quotes" "exitcode 0"
+
+trying "separate argument | is the pipe: pwd '|' grep -c alice gives 1"
+run_rc alien.py pwd '|' grep -c alice
+[[ "${RC}" == "0" && "$(< out.log)" == "1" ]] || fail "separate argument | is the pipe" "exitcode 0 and the output 1"
+
 # batch file: one command per line, the exitcode is the one of the last command
 printf 'ls %s\npwd\n' "${INVALID_DIR}" > cmds_ok.txt
 printf 'pwd\nls %s\n' "${INVALID_DIR}" > cmds_fail.txt

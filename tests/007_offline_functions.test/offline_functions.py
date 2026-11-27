@@ -57,7 +57,15 @@ def t_expand_path_local() -> None:
     old_cwd = os.getcwd()
     os.chdir(WORK_DIR)
     real_work = os.path.realpath(WORK_DIR)
-    check('expand_path_local(~)', expand_path_local('~'), f'{os.path.realpath(os.path.expanduser("~"))}/')
+    old_home = os.environ.get('HOME')  # HOME is set here: the HOME of a CI job can be a not existing directory
+    os.environ['HOME'] = WORK_DIR
+    check('expand_path_local(~ existing dir)', expand_path_local('~'), f'{real_work}/')
+    os.environ['HOME'] = os.path.join(WORK_DIR, 'missing_home')
+    check('expand_path_local(~ not existing)', expand_path_local('~'), f'{real_work}/missing_home')
+    if old_home is None:
+        os.environ.pop('HOME', None)
+    else:
+        os.environ['HOME'] = old_home
     check('expand_path_local(rel file)', expand_path_local('somefile'), f'{real_work}/somefile')
     check('expand_path_local(file: prefix)', expand_path_local('file:somefile'), f'{real_work}/somefile')
     check('expand_path_local(. is dir)', expand_path_local('.'), f'{real_work}/')

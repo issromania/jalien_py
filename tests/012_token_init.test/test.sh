@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# token-init with a present and valid token: kept (no re-creation), -q/-quiet, token given as env content, token-destroy;token-init,
-# token arguments when the user certificate is not usable; the token files of the user are never removed or re-created by this test
+# token-init with a present and valid token: kept (no re-creation, also with -nomail), -q/-quiet, token given as env content, token-destroy;token-init,
+# token arguments, -renew-usercert when the user certificate is not usable, -renew (on a copy of the token); the token files of the user are never removed or re-created by this test
 # the token of the environment is used: JALIEN_TOKEN_{CERT,KEY} (file names or content) or the default token files;
 # no user certificate is needed if the token is valid (CI tests have only a token)
 
@@ -88,6 +88,24 @@ expect_no_stdout "token-init -quiet with a valid token"
 expect_ok "token-init with token arguments and no usable user certificate" env X509_USER_CERT=/nonexistent X509_USER_KEY=/nonexistent alien.py token-init -v 1
 expect_err "token-init with token arguments and no usable user certificate" "WARNING: the token was not re-created"
 
+expect_ok "token-init -nomail with a valid token (kept)" alien.py token-init -nomail
+expect_line "token-init -nomail with a valid token (kept)" "${PRESENT}"
+
+expect_fail "token-init -renew -renew-usercert" alien.py token-init -renew -renew-usercert
+expect_err "token-init -renew -renew-usercert" "incompatible options, use only one"
+
+expect_fail "token-init -renew-usercert and no usable user certificate" env X509_USER_CERT=/nonexistent X509_USER_KEY=/nonexistent alien.py token-init -renew-usercert
+expect_err "token-init -renew-usercert and no usable user certificate" "No user certificate to be used by this command"
+
+expect_fail "token-init -renew without a valid token" env JALIEN_TOKEN_CERT="${WORKDIR}/missing_cert.pem" JALIEN_TOKEN_KEY="${WORKDIR}/missing_key.pem" alien.py token-init -renew
+expect_err "token-init -renew without a valid token" "for new token, just use the command without arguments"
+
+# -renew on a copy of the token: a new token is requested with the present one (no user certificate); the token of the user is not changed
+cp -p "${FILECERT}" "${WORKDIR}/renew_cert.pem" && cp -p "${FILEKEY}" "${WORKDIR}/renew_key.pem" && cp -p "${WORKDIR}/renew_cert.pem" "${WORKDIR}/renew_cert_old.pem" || fail "copy of the token for -renew" "the copies in ${WORKDIR}"
+expect_ok "token-init -renew -nomail (copy of the token, no user certificate)" env JALIEN_TOKEN_CERT="${WORKDIR}/renew_cert.pem" JALIEN_TOKEN_KEY="${WORKDIR}/renew_key.pem" X509_USER_CERT=/nonexistent X509_USER_KEY=/nonexistent alien.py token-init -renew -nomail
+cmp -s "${WORKDIR}/renew_cert.pem" "${WORKDIR}/renew_cert_old.pem" && fail "token-init -renew -nomail (copy of the token, no user certificate)" "a new token in ${WORKDIR}/renew_cert.pem"
+expect_ok "token-info -q of the renewed token" env JALIEN_TOKEN_CERT="${WORKDIR}/renew_cert.pem" JALIEN_TOKEN_KEY="${WORKDIR}/renew_key.pem" alien.py token-info -q
+
 # token given as content of the env variables
 export JALIEN_TOKEN_CERT="$(< "${FILECERT}")"
 export JALIEN_TOKEN_KEY="$(< "${FILEKEY}")"
@@ -104,7 +122,10 @@ expect_ok "token-destroy;token-init with the token as env content" alien.py "tok
 expect_line "token-destroy;token-init with the token as env content" "${PRESENT_ENV}"
 
 expect_ok "token-init with token arguments and the token as env content" alien.py token-init -v 1
-expect_err "token-init with token arguments and the token as env content" "it is not re-created"
+expect_err "token-init with token arguments and the token as env content" "these cannot be replaced within session!"
+
+expect_ok "token-init -renew with the token as env content" alien.py token-init -renew
+expect_err "token-init -renew with the token as env content" "these cannot be replaced within session!"
 
 [[ -f "${FILECERT}" && -f "${FILEKEY}" ]] || fail "token files kept" "the token files ${FILECERT} ${FILEKEY}"
 

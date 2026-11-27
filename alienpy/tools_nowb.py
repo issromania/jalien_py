@@ -138,6 +138,35 @@ def convert_time(str_line: str, color: bool = True) -> str:
 def unquote_str(arg: str) -> str: return ast.literal_eval(arg) if isinstance(arg, str) else ''
 
 
+def unquoted_split(text: str, separators: tuple, maxsplit: int = -1) -> list:
+    """Split text at the separators found outside quotes ('...', "...") and not escaped with \\ (as shlex posix); the parts are kept as they are (quotes included)"""
+    parts = []
+    start = i = 0
+    quote = ''
+    while i < len(text):
+        c = text[i]
+        if quote:  # inside quotes only the closing quote (and \\ escapes within "...") matter
+            if c == quote:
+                quote = ''
+            elif c == '\\' and quote == '"':
+                i += 1
+        elif c in ('"', "'"):
+            quote = c
+        elif c == '\\':
+            i += 1  # the escaped char is not a separator
+        elif maxsplit != 0:
+            sep = next((s for s in separators if text.startswith(s, i)), '')
+            if sep:
+                parts.append(text[start:i])
+                i += len(sep)
+                start = i
+                maxsplit -= 1
+                continue
+        i += 1
+    parts.append(text[start:])
+    return parts
+
+
 def dequote(s: str) -> str:
     """Remove only 1 quotes in the string limits"""
     if (len(s) >= 2 and s[0] == s[-1]) and s.startswith(("'", '"')): return s[1:-1]

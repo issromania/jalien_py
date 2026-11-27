@@ -67,7 +67,7 @@ from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cert_inval
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
                          deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
                          get_arg, get_arg_multiple, get_arg_value, get_lfn_key, import_aliases, is_help, list_remove_item,
-                         md5, mk_xml_local, name2regex, name_is_plain_regex, queryML, signal_handler, unixtime2local, set_xattr_list)
+                         md5, mk_xml_local, name2regex, name_is_plain_regex, queryML, signal_handler, unixtime2local, set_xattr_list, unquoted_split)
 # commands stack tools
 from .tools_stackcmd import deque_pop_pos, push2stack
 # shell related tools
@@ -2037,7 +2037,8 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
             continue
 
         # process the input and take care of pipe to shell
-        input_alien, __, pipe_to_shell_cmd = cmdline.partition(' | ')
+        input_alien, *pipe_part = unquoted_split(cmdline, (' | ',), maxsplit = 1)  # a | within a quoted argument is part of the argument
+        pipe_to_shell_cmd = pipe_part[0] if pipe_part else ''
         if not input_alien:
             logging.error('AliEn command before the | token was not found\n%s\n', cmdline)
             continue

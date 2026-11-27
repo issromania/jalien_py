@@ -167,6 +167,13 @@ def unquoted_split(text: str, separators: tuple, maxsplit: int = -1) -> list:
     return parts
 
 
+def argv2cmdline(argv: list) -> str:
+    """Command line from several arguments (as given by the shell): each argument is kept as it is (it is quoted), except:
+    an argument with a ; that is not quoted (command separator, with or without whitespace) is used as command line text,
+    an argument that is exactly | is the pipe to a shell command (the next arguments are given quoted to the shell, a further | is a shell pipe)"""
+    return ' '.join(arg if arg == '|' or len(unquoted_split(arg, (';',))) > 1 else shlex.quote(arg) for arg in argv)
+
+
 def dequote(s: str) -> str:
     """Remove only 1 quotes in the string limits"""
     if (len(s) >= 2 and s[0] == s[-1]) and s.startswith(("'", '"')): return s[1:-1]

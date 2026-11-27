@@ -24,7 +24,6 @@ from pathlib import Path
 import subprocess  # nosec
 import logging
 import shlex
-from shlex import join as shlex_join
 import statistics
 from typing import Optional, Union
 import time
@@ -65,7 +64,7 @@ from . import wb_api as _wb_api  # access to the live _wb_api.ALIENPY_GLOBAL_WB 
 from .connect_ssl import CertInfo, CertKeyMatch, CertVerify, ca_path, cert_invalid_reason, cred_invalid_reason, get_valid_certs, get_valid_tokens, token_env_content, token_files
 ##   General misc functions library
 from .tools_nowb import (GetHumanReadableSize, PrintColor, ccdb_json_cleanup, check_port, convert_jdl2dict, convert_time, convert_trace2dict,
-                         deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
+                         argv2cmdline, deltat_ms_perf, dequote, exit_message, exitcode, file2file_dict, file2list, fileIsValid, getCAcerts,
                          get_arg, get_arg_multiple, get_arg_value, get_lfn_key, import_aliases, is_help, list_remove_item,
                          md5, mk_xml_local, name2regex, name_is_plain_regex, queryML, signal_handler, unixtime2local, set_xattr_list, unquoted_split)
 # commands stack tools
@@ -2010,12 +2009,8 @@ def ProcessCommandChain(wb: Optional[WebSocketClientProtocol], cmd_chain: Union[
     if isinstance(cmd_chain, list):
         if len(cmd_chain) == 1:
             cmd_string = dequote(cmd_chain[0])  # a single argument is the command line: it is split taking into account the quotes
-        elif '|' in cmd_chain:  # several arguments are kept as they are; an argument that is exactly | is the pipe to a shell command
-            pipe_idx = cmd_chain.index('|')
-            shell_cmd = ' '.join(arg if arg == '|' else shlex.quote(arg) for arg in cmd_chain[pipe_idx + 1:])
-            cmd_string = f'{shlex_join(cmd_chain[:pipe_idx])} | {shell_cmd}'
         else:
-            cmd_string = shlex_join(cmd_chain)  # several arguments are kept as they are
+            cmd_string = argv2cmdline(cmd_chain)  # several arguments are kept as they are, except the command separator ; and the pipe |
     else:
         cmd_string = cmd_chain
 

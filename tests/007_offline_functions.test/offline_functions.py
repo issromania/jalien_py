@@ -31,7 +31,7 @@ os.environ['ALIENPY_DEBUG_FILE'] = os.path.join(WORK_DIR, 'alienpy_debug.log')
 from alienpy.global_vars import AlienSessionInfo  # noqa: E402
 from alienpy.tools_nowb import (CreateJsonCommand, create_metafile, expand_path_local, fileIsValid, filter_file_prop, format_dst_fn, get_arg,  # noqa: E402
                                 get_arg_2values, get_arg_value, get_arg_value_multiple, get_hash_meta, get_lfn_meta, get_lfn_name, get_size_meta,
-                                is_help, list_files_local, make_tmp_fn, md5, name2regex, name_is_plain_regex, time_str2unixmili, valid_regex)
+                                is_help, list_files_local, make_tmp_fn, md5, name2regex, name_is_plain_regex, time_str2unixmili, unquoted_split, valid_regex)
 from alienpy.tools_stackcmd import deque_pop_pos  # noqa: E402
 from alienpy.wb_api import retf_result2ret  # noqa: E402
 from alienpy.xrd_tools import expand_path_grid  # noqa: E402
@@ -296,10 +296,31 @@ def t_stack() -> None:
     check('deque_pop_pos out of range', deque_pop_pos(dq, 5), '')
 
 
+def t_unquoted_split() -> None:
+    """Split of command chains (; and new line) and shell pipe ( | ) only outside quotes and \\ escapes"""
+    chain = (';', '\n')
+    pipe = (' | ',)
+    cases = (('a; b\nc', chain, -1, ['a', ' b', 'c']),
+             ('ls "a;b"; pwd', chain, -1, ['ls "a;b"', ' pwd']),
+             ("ls 'a;b'", chain, -1, ["ls 'a;b'"]),
+             ('ls a\\;b', chain, -1, ['ls a\\;b']),
+             ('ls "a\\"; b"; pwd', chain, -1, ['ls "a\\"; b"', ' pwd']),  # \\" within "..." does not close it
+             ("ls 'a\\'; b", chain, -1, ["ls 'a\\'", ' b']),  # no escape within '...'
+             ('ls "a; b', chain, -1, ['ls "a; b']),  # not closed: no split (the command line error comes later)
+             ('ls x | grep y', pipe, 1, ['ls x', 'grep y']),
+             ('ls "ls | x"', pipe, 1, ['ls "ls | x"']),
+             ("ls 'a | b' | grep 'c | d'", pipe, 1, ["ls 'a | b'", "grep 'c | d'"]),
+             ('ls | grep a | wc -l', pipe, 1, ['ls', 'grep a | wc -l']),
+             ('ls x|y', pipe, 1, ['ls x|y']),
+             ('', chain, -1, ['']))
+    for text, separators, maxsplit, expected in cases:
+        check(f'unquoted_split({text!r})', unquoted_split(text, separators, maxsplit), expected)
+
+
 if __name__ == '__main__':
     try:
         for test in (t_expand_path_grid, t_expand_path_local, t_args, t_name2regex, t_format_dst_fn, t_list_files_local,
-                     t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack):
+                     t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack, t_unquoted_split):
             print(f'Trying {test.__doc__.splitlines()[0]} ..', flush = True)
             try:
                 test()

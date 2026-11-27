@@ -76,10 +76,20 @@ run_rc alien.py "ls '${INVALID_DIR} | x'"
 [[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "command line with a quoted ' | '" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
 grep -qF "Invalid command line" out.log && fail "command line with a quoted ' | '" "no command line error"
 
-trying "argument with ; (separate argument): no chain, ls fails as for a missing dir (${LS_FAIL_RC})"
+trying "; not quoted in an argument is a command separator: ls <missing>;pwd gives the pwd output, exitcode 0"
 run_rc alien.py ls "${INVALID_DIR};pwd"
-[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "argument with ;" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
-grep -qF "Invalid command line" out.log && fail "argument with ;" "no command line error"
+[[ "${RC}" == "0" ]] || fail "; within an argument" "exitcode 0 (of pwd)"
+grep -qxF "${ALIEN_HOME}" out.log || fail "; within an argument" "the pwd output >${ALIEN_HOME}<"
+
+trying "; as separate argument is a command separator: ls <missing> ';' pwd gives the pwd output, exitcode 0"
+run_rc alien.py ls "${INVALID_DIR}" ';' pwd
+[[ "${RC}" == "0" ]] || fail "; as separate argument" "exitcode 0 (of pwd)"
+grep -qxF "${ALIEN_HOME}" out.log || fail "; as separate argument" "the pwd output >${ALIEN_HOME}<"
+
+trying "quoted ; in the command line: no chain, ls fails as for a missing dir (${LS_FAIL_RC})"
+run_rc alien.py "ls '${INVALID_DIR};pwd'"
+[[ "${RC}" == "${LS_FAIL_RC}" ]] || fail "quoted ; in the command line" "exitcode ${LS_FAIL_RC} (of ls of a missing dir)"
+grep -qF "Invalid command line" out.log && fail "quoted ; in the command line" "no command line error"
 
 trying "argument with a space stays one argument: ls '<home> -l' fails (no such entry)"
 run_rc alien.py ls "${ALIEN_HOME} -l"

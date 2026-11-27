@@ -30,7 +30,7 @@ os.environ['ALIENPY_DEBUG_FILE'] = os.path.join(WORK_DIR, 'alienpy_debug.log')
 
 from alienpy.alien import cmdline_from_verb  # noqa: E402
 from alienpy.global_vars import AlienSessionInfo  # noqa: E402
-from alienpy.tools_nowb import (CreateJsonCommand, create_metafile, expand_path_local, fileIsValid, filter_file_prop, format_dst_fn, get_arg,  # noqa: E402
+from alienpy.tools_nowb import (CreateJsonCommand, argv2cmdline, create_metafile, expand_path_local, fileIsValid, filter_file_prop, format_dst_fn, get_arg,  # noqa: E402
                                 get_arg_2values, get_arg_value, get_arg_value_multiple, get_hash_meta, get_lfn_meta, get_lfn_name, get_size_meta,
                                 is_help, list_files_local, make_tmp_fn, md5, name2regex, name_is_plain_regex, time_str2unixmili, unquoted_split, valid_regex)
 from alienpy.tools_stackcmd import deque_pop_pos  # noqa: E402
@@ -326,11 +326,24 @@ def t_cmdline_from_verb() -> None:
     check('cmdline_from_verb(none)', cmdline_from_verb('pwd', []), ['pwd'])
 
 
+def t_argv2cmdline() -> None:
+    """Several arguments: kept as they are (quoted), except a not quoted ; (command separator) and an argument that is exactly | (pipe)"""
+    cases = ((['ls', 'a b'], "ls 'a b'"),
+             (['ls', 'a | b'], "ls 'a | b'"),
+             (['ls', 'a', ';', 'pwd'], 'ls a ; pwd'),
+             (['ls', 'a;', 'pwd'], 'ls a; pwd'),
+             (['ls', 'a;pwd'], 'ls a;pwd'),
+             (['ls', "'a;b'"], "ls ''\"'\"'a;b'\"'\"''"),  # quoted ; : kept (quoted) as it is
+             (['pwd', '|', 'grep', 'a b', '|', 'wc', '-l'], "pwd | grep 'a b' | wc -l"))
+    for argv, expected in cases:
+        check(f'argv2cmdline({argv!r})', argv2cmdline(argv), expected)
+
+
 if __name__ == '__main__':
     try:
         for test in (t_expand_path_grid, t_expand_path_local, t_args, t_name2regex, t_format_dst_fn, t_list_files_local,
                      t_filter_file_prop, t_time, t_integrity, t_metafile, t_tmp_names, t_json_and_answers, t_stack, t_unquoted_split,
-                     t_cmdline_from_verb):
+                     t_cmdline_from_verb, t_argv2cmdline):
             print(f'Trying {test.__doc__.splitlines()[0]} ..', flush = True)
             try:
                 test()

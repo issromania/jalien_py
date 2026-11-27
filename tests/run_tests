@@ -10,8 +10,9 @@ SCRIPT_DIR="$(realpath --canonicalize-existing "$( cd -- "$( dirname -- "${BASH_
 mapfile -t test_dirlist < <(find "${SCRIPT_DIR}" -type d -name "*.test" | sort)  # one entry per line: paths with spaces
 
 # not run in CI (ci-tests, as in alidist xjalienfs.sh): CI has only a token, given by JALIEN_TOKEN_{CERT,KEY}, and no user certificate;
-# these tests are about the credentials of the user (default token files, token creation/destroy with the user certificate)
-CI_SKIP_TESTS=("002_env_tokens.test" "012_token_init.test")
+# 002, 012 are about the credentials of the user (default token files, token creation/destroy with the user certificate);
+# 009 needs the session file ~/.alienpy_session: the HOME of the CI (mesos) containers does not exist
+CI_SKIP_TESTS=("002_env_tokens.test" "009_session_cmds.test" "012_token_init.test")
 
 FAILED_TESTS="0"
 
